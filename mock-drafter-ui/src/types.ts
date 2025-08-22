@@ -41,14 +41,27 @@ export interface BotProfile {
   isHuman: boolean
   inheritGlobal: boolean
   preset: Preset
-  qbPriority: number         // 0 (very late) -> 100 (very early)
-  rbEmphasis: number         // -50 (de-emphasize) -> +50 (emphasize)
+
+  /** QB strategy */
+  qbMode: 'PRIORITY' | 'EARLIEST_ROUND'
+  /** used when qbMode === 'PRIORITY' (0 = very late, 100 = very early) */
+  qbPriority: number
+  /** used when qbMode === 'EARLIEST_ROUND' (1..20) */
+  qbEarliestRound: number
+
+  /** Position emphasis (–50..+50) */
+  rbEmphasis: number
   wrEmphasis: number
   teEmphasis: number
-  teamNeedsSensitivity: number  // 0 -> 100
-  riskTolerance: number         // 0 -> 100
-  randomness: number            // 0 -> 100
-  avoidKdUntil: number          // earliest round to consider K/DST
+
+  /** Other knobs (0..100) */
+  teamNeedsSensitivity: number
+  riskTolerance: number
+  randomness: number
+
+  /** Earliest round to consider K/DST */
+  avoidKdUntil: number
+
   favorites: string[]
 }
 

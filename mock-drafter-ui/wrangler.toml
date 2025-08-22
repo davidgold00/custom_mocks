@@ -1,0 +1,10 @@
+# wrangler.toml — Cloudflare Pages (Functions) dev config
+name = "mock-drafter-ui"
+compatibility_date = "2024-11-01"
+
+# KV bindings MUST use non-empty strings for ids
+[[kv_namespaces]]
+binding = "MOCKS_KV"
+# For local dev you can use placeholders; wrangler will stub the KV
+id = "mockdrafter_kv_prod"
+preview_id = "mockdrafter_kv_preview"

@@ -1,154 +1,180 @@
-import { BotProfile, DraftState, LeagueSettings, Player, Position, TeamRoster } from '@/types'
-import rawPlayers from '@/data/players.json'
+import playersData from '@/data/players.json'
+import type {
+  Player,
+  BotProfile,
+  LeagueSettings,
+  DraftState,
+  Position,
+} from '@/types'
 
-const ALL_PLAYERS: Player[] = (rawPlayers as Player[]).sort((a,b)=>a.adp-b.adp)
-
-export function makeDefaultRoster(): TeamRoster {
-  return { picks: [], byPos: { QB:0, RB:0, WR:0, TE:0, K:0, DST:0 } as any }
-}
-
-export function computeSnakeOrder(teams: number): number[] {
-  // order for a single round: 0..teams-1, next round reverses
-  return Array.from({length: teams}, (_, i) => i)
-}
-
-export function initDraftState(settings: LeagueSettings): DraftState {
-  const rosters: TeamRoster[] = Array.from({length: settings.teams}, () => makeDefaultRoster())
-  return {
-    order: computeSnakeOrder(settings.teams),
-    currentPickIndex: 0,
-    picks: [],
-    taken: new Set(),
-    rosters,
-  }
-}
-
-export function availablePlayers(taken: Set<string>): Player[] {
-  return ALL_PLAYERS.filter(p => !taken.has(p.id))
-}
-
-type NeedMap = Record<Position, number>
-
-function teamNeeds(settings: LeagueSettings, team: TeamRoster): NeedMap {
-  const req = settings.roster
-  const needs: NeedMap = { QB:0, RB:0, WR:0, TE:0, K:0, DST:0 }
-  ;(['QB','RB','WR','TE','K','DST'] as Position[]).forEach(pos => {
-    // starters needed minus already drafted at that position
-    const required = (req as any)[pos] ?? 0
-    needs[pos] = Math.max(0, required - (team.byPos as any)[pos])
+/** Mutates the draft state in-place for a new pick */
+export function applyPick(
+  state: DraftState,
+  teamIndex: number,
+  player: Player,
+  round: number,
+  overall: number
+) {
+  // picks array
+  state.picks.push({
+    round,
+    overall,
+    teamIndex,
+    playerId: player.id,
   })
-  // Flex handled loosely: if FLEX slots exist, add fractional needs to RB/WR/TE
-  const flex = req.FLEX ?? 0
-  if (flex > 0) {
-    const minFlexTargets: Position[] = ['RB','WR','TE']
-    minFlexTargets.forEach(pos => { needs[pos] += flex / 3 })
+
+  // taken set
+  if (!state.taken) (state as any).taken = new Set<string>()
+  state.taken.add(player.id)
+
+  // roster bookkeeping if present
+  if (state.rosters && state.rosters[teamIndex]) {
+    const r = state.rosters[teamIndex]
+    r.picks.push(player.id)
+    // TS: byPos is Record<Position, number>
+    ;(r.byPos as any)[player.pos] = ((r.byPos as any)[player.pos] ?? 0) + 1
   }
-  return needs
 }
 
-function earliestRoundAllowed(pos: Position, round: number, avoidKdUntil: number) {
-  if ((pos === 'K' || pos === 'DST') && round < avoidKdUntil) return false
+/** Basic helper: count team picks by position (from state.picks) */
+function countTeamPos(state: DraftState, teamIndex: number) {
+  const acc: Record<Position, number> = {
+    QB: 0, RB: 0, WR: 0, TE: 0, K: 0, DST: 0
+  }
+  for (const p of state.picks) {
+    if (p.teamIndex !== teamIndex) continue
+    // we only have playerId here; resolve once per call
+    const pl = (playersData as Player[]).find(pp => pp.id === p.playerId)
+    if (pl) acc[pl.pos]++
+  }
+  return acc
+}
+
+function flexRemaining(
+  settings: LeagueSettings,
+  teamCounts: Record<Position, number>
+) {
+  // FLEX consumes RB/WR/TE overflow; count primary needs first
+  const { roster } = settings
+  // How many primaries left for those three?
+  const needRB = Math.max(0, roster.RB - teamCounts.RB)
+  const needWR = Math.max(0, roster.WR - teamCounts.WR)
+  const needTE = Math.max(0, roster.TE - teamCounts.TE)
+  // Flex slots left
+  const flexLeft = Math.max(0, roster.FLEX)
+  // Flex that is still free after primary needs (rough heuristic)
+  return Math.max(
+    0,
+    flexLeft - (needRB > 0 ? 0 : 0) - (needWR > 0 ? 0 : 0) - (needTE > 0 ? 0 : 0)
+  )
+}
+
+/** Returns true if a player is **allowed** to be picked this round for the given profile */
+function isAllowedThisRound(
+  profile: BotProfile,
+  round: number,
+  p: Player
+): boolean {
+  // K/DST lockout
+  const avoidKdUntil = profile.avoidKdUntil ?? 12
+  if ((p.pos === 'K' || p.pos === 'DST') && round < avoidKdUntil) return false
+
+  // QB earliest-round mode
+  const qbMode = (profile as any).qbMode as ('PRIORITY'|'EARLIEST_ROUND'|undefined)
+  const qbEarliest = (profile as any).qbEarliestRound as (number|undefined)
+
+  if (qbMode === 'EARLIEST_ROUND') {
+    // default to very late if not specified (defensive)
+    const gate = typeof qbEarliest === 'number' ? qbEarliest : 99
+    if (p.pos === 'QB' && round < gate) return false
+  }
+
   return true
 }
 
-function posWeight(profile: BotProfile, pos: Position): number {
-  switch (pos) {
-    case 'RB': return 1 + profile.rbEmphasis/100
-    case 'WR': return 1 + profile.wrEmphasis/100
-    case 'TE': return 1 + profile.teEmphasis/100
-    case 'QB': {
-      // map qbPriority (0-100) into an early-round boost that fades later (handled in score calc)
-      return 1 + (profile.qbPriority - 50) / 200 // small base tilt here
-    }
-    default: return 1
-  }
-}
-
-function withinFavorites(profile: BotProfile, player: Player): boolean {
-  return profile.favorites.some(f => f.toLowerCase() === player.name.toLowerCase())
-}
-
-function scoreCandidate(
-  player: Player,
-  settings: LeagueSettings,
+/** Very lightweight scorer with position biases + team needs + ADP */
+function scorePlayer(
+  p: Player,
   profile: BotProfile,
-  round: number,
-  needs: NeedMap,
-  team: TeamRoster,
+  settings: LeagueSettings,
+  teamCounts: Record<Position, number>
 ): number {
-  // Base: inverse of ADP (lower ADP = higher score)
-  let score = 1000 - player.adp
+  // Base on inverse ADP (lower ADP is better)
+  let score = -p.adp
 
-  // Deprioritize K/DST until allowed
-  if (!earliestRoundAllowed(player.pos, round, profile.avoidKdUntil)) {
-    score -= 10000
+  // Position biases (wr/rb/te emphasis are -50..+50)
+  const rbBias = (profile.rbEmphasis ?? 0)
+  const wrBias = (profile.wrEmphasis ?? 0)
+  const teBias = (profile.teEmphasis ?? 0)
+
+  // QB priority slider (0..100) -> -50..+50
+  const qbMode = (profile as any).qbMode as ('PRIORITY'|'EARLIEST_ROUND'|undefined)
+  const qbPriority = (profile.qbPriority ?? 50) - 50
+  const qbBias = qbMode === 'PRIORITY' ? qbPriority : 0
+
+  // Apply position bias
+  if (p.pos === 'RB') score += rbBias
+  if (p.pos === 'WR') score += wrBias
+  if (p.pos === 'TE') score += teBias
+  if (p.pos === 'QB') score += qbBias
+
+  // Team needs bonus: prefer filling starting slots first
+  const need = (want: number, have: number) => Math.max(0, want - have)
+  const want = settings.roster
+
+  const primaryNeed: Record<Position, number> = {
+    QB: need(want.QB, teamCounts.QB),
+    RB: need(want.RB, teamCounts.RB),
+    WR: need(want.WR, teamCounts.WR),
+    TE: need(want.TE, teamCounts.TE),
+    K:  need(want.K,  teamCounts.K),
+    DST: need(want.DST, teamCounts.DST),
   }
 
-  // Positional emphasis
-  score *= posWeight(profile, player.pos)
+  // FLEX handling
+  const flexLeft = want.FLEX // we just treat FLEX as a milder bonus
+  const flexEligible = (p.pos === 'RB' || p.pos === 'WR' || p.pos === 'TE')
 
-  // Team needs urgency
-  const need = (needs as any)[player.pos] ?? 0
-  score += need * (profile.teamNeedsSensitivity / 10) // up to +10 per unmet slot
-
-  // QB timing: if early priority and no QB yet, add boost in early rounds
-  if (player.pos === 'QB' && team.byPos.QB === 0) {
-    const earlyFactor = (profile.qbPriority / 100) // 0..1
-    // Boost is bigger in rounds 1-4, fades later
-    const roundBoost = Math.max(0, 6 - round) * 12
-    score += earlyFactor * roundBoost
-  }
-  // Risk tolerance: allow reaching beyond top list
-  score += (profile.riskTolerance - 50) // small nudge for aggressive bots
-
-  // Favorites: strong bump within ~2 rounds of typical ADP
-  if (withinFavorites(profile, player)) {
-    const reachWindow = 24 // ~2 rounds in 12-team
-    const delta = Math.max(0, reachWindow - Math.abs(player.adp - (round*12)))
-    score += 40 + delta/3
-  }
-
-  // Tiny randomness
-  const epsilon = (profile.randomness/100) * (Math.random()*10)
-  score += epsilon
+  // Primary slots get a strong boost, FLEX a mild boost, otherwise small
+  if (primaryNeed[p.pos] > 0) score += 40
+  else if (flexEligible && flexLeft > 0) score += 10
+  else score += 2 // bench depth
 
   return score
 }
 
+/**
+ * pickForBot — the engine that chooses a player for a bot seat.
+ * Enforces:
+ *  - K/DST earliest round (avoidKdUntil)
+ *  - QB earliest round when qbMode === 'EARLIEST_ROUND'
+ */
 export function pickForBot(
   settings: LeagueSettings,
   state: DraftState,
   profile: BotProfile,
   round: number,
-  teamIndex: number,
+  teamIndex: number
 ): Player | null {
-  const pool = availablePlayers(state.taken)
-  const team = state.rosters[teamIndex]
-  const needs = teamNeeds(settings, team)
+  const taken = state.taken ?? new Set<string>()
+  let avail = (playersData as Player[]).filter(p => !taken.has(p.id))
 
-  // Consider top N + some reach window depending on risk
-  const window = Math.min(pool.length, 40 + Math.floor(profile.riskTolerance/2))
-  const candidates = pool.slice(0, window)
+  // Hard filters for this round based on profile
+  let pool = avail.filter(p => isAllowedThisRound(profile, round, p))
+  if (pool.length === 0) pool = avail // never stall the draft; fall back
+
+  // Score candidates
+  const counts = countTeamPos(state, teamIndex)
 
   let best: Player | null = null
-  let bestScore = -1e9
+  let bestScore = -Infinity
 
-  for (const p of candidates) {
-    const s = scoreCandidate(p, settings, profile, round, needs, team)
+  for (const p of pool) {
+    const s = scorePlayer(p, profile, settings, counts)
     if (s > bestScore) {
-      best = p
       bestScore = s
+      best = p
     }
   }
   return best
 }
-
-export function applyPick(state: DraftState, teamIndex: number, player: Player, round: number, overall: number) {
-  state.taken.add(player.id)
-  state.picks.push({ round, overall, teamIndex, playerId: player.id })
-  const roster = state.rosters[teamIndex]
-  roster.picks.push(player.id)
-  ;(roster.byPos as any)[player.pos] = ((roster.byPos as any)[player.pos] ?? 0) + 1
-}
-
-export const SAMPLE_PLAYERS = ALL_PLAYERS
