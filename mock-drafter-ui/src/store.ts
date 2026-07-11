@@ -6,8 +6,10 @@ import type {
   LeagueSettings,
   Position,
   Preset,
+  RankingsPrefs,
   RosterRequirements,
 } from '@/types'
+import { PRESET_VALUES } from '@/lib/presets'
 
 /* ---------------------- defaults ---------------------- */
 
@@ -97,7 +99,14 @@ const makeDraft = (settings: LeagueSettings): DraftState => {
       picks: [],
       byPos: makeEmptyByPos(),
     })),
+    seed: (Math.random() * 0x7fffffff) | 0,
   }
+}
+
+const DEFAULT_RANKINGS: RankingsPrefs = {
+  baseSourceId: 'ffc-ppr',
+  customOrder: null,
+  updatedAt: null,
 }
 
 /* ---------------------- store ---------------------- */
@@ -109,6 +118,12 @@ type UIState = {
   draft: DraftState | null
   humanIndex: number | null
   pickTimer: number
+  rankings: RankingsPrefs
+
+  // rankings management
+  setBaseSource: (id: string) => void
+  setCustomOrder: (order: string[]) => void
+  resetCustomOrder: () => void
 
   // settings management
   setSettings: (p: Partial<LeagueSettings>) => void
@@ -133,6 +148,20 @@ export const useUI = create<UIState>()(
       draft: null,
       humanIndex: null,
       pickTimer: 60,
+      rankings: DEFAULT_RANKINGS,
+
+      setBaseSource: (id) =>
+        set({ rankings: { baseSourceId: id, customOrder: null, updatedAt: null } }),
+
+      setCustomOrder: (order) =>
+        set((s) => ({
+          rankings: { ...s.rankings, customOrder: order, updatedAt: new Date().toISOString() },
+        })),
+
+      resetCustomOrder: () =>
+        set((s) => ({
+          rankings: { ...s.rankings, customOrder: null, updatedAt: null },
+        })),
 
       setSettings: (p) => {
         const prev = get().settings
@@ -174,7 +203,8 @@ export const useUI = create<UIState>()(
       applyPreset: (i, preset) => {
         set((s) => {
           const bots = [...s.bots]
-          bots[i] = { ...bots[i], preset }
+          // presets materialize real slider values so they actually change behavior
+          bots[i] = migrateBot({ ...bots[i], preset, ...PRESET_VALUES[preset] })
           return { bots }
         })
       },
@@ -188,18 +218,19 @@ export const useUI = create<UIState>()(
     }),
     {
       name: 'mockdrafter-ui',
-      version: 2,
-      // migrate old saves to include qb fields + new team default respected on fresh loads
+      version: 3,
       migrate: (state: any) => {
         if (!state) return state
         if (state.bots) state.bots = state.bots.map((b: any) => migrateBot(b))
         if (state.globalBot) state.globalBot = migrateBot(state.globalBot)
+        if (!state.rankings) state.rankings = DEFAULT_RANKINGS
         return state
       },
       partialize: (s) => ({
         settings: s.settings,
         bots: s.bots,
         globalBot: s.globalBot,
+        rankings: s.rankings,
       }),
     }
   )

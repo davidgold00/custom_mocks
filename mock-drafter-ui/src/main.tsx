@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './styles.css'
 import App from './App'
 import Dashboard from './pages/Dashboard'
+import Rankings from './pages/Rankings'
 import SetupLeague from './pages/SetupLeague'
 import ConfigureBots from './pages/ConfigureBots'
 import DraftRoom from './pages/DraftRoom'
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <Dashboard /> },
+      { path: 'rankings', element: <Rankings /> },
       { path: 'setup', element: <SetupLeague /> },
       { path: 'bots', element: <ConfigureBots /> },
       { path: 'draft', element: <DraftRoom /> },

@@ -1,11 +1,37 @@
 export type Position = 'QB'|'RB'|'WR'|'TE'|'K'|'DST'
 
+/** Canonical player record from the bundled 2026 data snapshot */
 export interface Player {
   id: string
   name: string
   team: string
   pos: Position
-  adp: number
+  bye: number | null
+  injuryStatus?: string | null
+}
+
+/** A player placed on a ranking board (user's or a source's) */
+export interface RankedPlayer extends Player {
+  rank: number
+  adp: number | null
+  stdev?: number | null
+}
+
+export interface RankingSourceMeta {
+  id: string
+  label: string
+  provider: string
+  kind: string
+  detail: string
+  coverage: number
+}
+
+/** User's active board: which public source it's based on + their edits */
+export interface RankingsPrefs {
+  baseSourceId: string
+  /** full player-id ordering once the user edits; null = follow source as-is */
+  customOrder: string[] | null
+  updatedAt: string | null
 }
 
 export interface RosterRequirements {
@@ -83,4 +109,6 @@ export interface DraftState {
   picks: Pick[]
   taken: Set<string>
   rosters: TeamRoster[]
+  /** RNG seed so a draft is replayable; every sim gets a fresh one */
+  seed: number
 }

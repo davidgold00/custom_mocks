@@ -1,10 +1,11 @@
 import { Card, CardBody, CardHeader, Button, Input, Select } from '@/components/Card'
+import { PosBadge, InjuryBadge, POS_SOLID } from '@/components/PosBadge'
 import { useUI } from '@/store'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { applyPick, pickForBot } from '@/lib/draftEngine'
-import { Player, BotProfile } from '@/types'
-import playersData from '@/data/players.json'
-import { loadMock, saveMock, debounce } from '@/lib/api' // <-- NEW
+import { applyPick, pickForBot, mulberry32 } from '@/lib/draftEngine'
+import { RankedPlayer, BotProfile } from '@/types'
+import { PLAYER_MAP, useBoard } from '@/lib/rankings'
+import { loadMock, saveMock, debounce } from '@/lib/api'
 
 type Panel = 'LOG' | 'ROSTER'
 const POS = ['ALL','QB','RB','WR','TE','K','DST'] as const
@@ -154,15 +155,13 @@ export default function DraftRoom() {
 
   useEffect(() => { saveDebounced() }, [state, round, overall, log, humanIndex])
 
-  const players = playersData as Player[]
+  const board = useBoard()
 
   /* ---------- derived ---------- */
   const available = useMemo(() => {
     const taken = state?.taken ?? new Set<string>()
-    return players
-      .filter(p => !taken.has(p.id))
-      .sort((a, b) => a.adp - b.adp)
-  }, [players, state])
+    return board.filter(p => !taken.has(p.id)) // board is already in rank order
+  }, [board, state])
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase()
@@ -192,7 +191,7 @@ export default function DraftRoom() {
     return { ...globalBot, name, isHuman, inheritGlobal, preset, favorites }
   }
 
-  function makePick(teamIndex: number, player: Player, rd: number, ov: number, who: string) {
+  function makePick(teamIndex: number, player: RankedPlayer, rd: number, ov: number, who: string) {
     if (!state) return
     applyPick(state, teamIndex, player, rd, ov) // mutates
     setState({ ...state, picks: [...state.picks] })
@@ -214,9 +213,12 @@ export default function DraftRoom() {
     // Stop the loop if it's the user's seat
     if (humanIndex === currentTeam) return
 
-    // bot pick
+    // bot pick — off the user's board, seeded per pick so drafts are replayable
     const profile = effectiveProfile(currentSeat)
-    const choice = pickForBot(settings, state, profile, round, currentTeam) ?? available[0]
+    const rng = mulberry32(((state.seed ?? 1) ^ Math.imul(overall, 0x9e3779b1)) >>> 0)
+    const choice =
+      pickForBot({ pool: available, settings, state, profile, round, teamIndex: currentTeam, rng }) ??
+      available[0]
     if (!choice) return
     makePick(currentTeam, choice, round, overall, currentSeat.name)
   }
@@ -455,12 +457,12 @@ function Board({
 }
 
 function Picked({ playerId }: { playerId: string }) {
-  const data = (playersData as Player[]).find(p => p.id === playerId)
+  const data = PLAYER_MAP[playerId]
   if (!data) return null
   return (
-    <div className="truncate">
-      <div className="font-medium">{data.name}</div>
-      <div className="text-[10px] text-slate-500">{data.pos}</div>
+    <div className={`truncate border-l-2 pl-1.5 ${POS_SOLID[data.pos].replace('bg-', 'border-')}`}>
+      <div className="font-medium truncate">{data.name}</div>
+      <div className="text-[10px] text-slate-500">{data.pos} · {data.team}</div>
     </div>
   )
 }
@@ -471,29 +473,35 @@ function PlayersTable({
   disabled,
   onPick
 }:{
-  rows: Player[]
+  rows: RankedPlayer[]
   disabled: boolean
-  onPick: (p: Player) => void
+  onPick: (p: RankedPlayer) => void
 }) {
   return (
     <div className="overflow-auto max-h-[420px]">
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-slate-50 z-10">
-          <tr className="text-left">
-            <th className="px-3 py-2 w-10">RK</th>
+          <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+            <th className="px-3 py-2 w-12">Rank</th>
             <th className="px-3 py-2">Player</th>
-            <th className="px-3 py-2 w-16">Pos</th>
+            <th className="px-3 py-2 w-14">Pos</th>
+            <th className="px-3 py-2 w-14">Bye</th>
             <th className="px-3 py-2 w-16">ADP</th>
             <th className="px-3 py-2 w-24 text-right">Action</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((p, i) => (
-            <tr key={p.id} className="border-b border-slate-100">
-              <td className="px-3 py-2 text-slate-500">{i + 1}</td>
-              <td className="px-3 py-2">{p.name}</td>
-              <td className="px-3 py-2">{p.pos}</td>
-              <td className="px-3 py-2">{p.adp}</td>
+          {rows.map((p) => (
+            <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/70">
+              <td className="px-3 py-2 font-semibold text-slate-600">{p.rank}</td>
+              <td className="px-3 py-2">
+                <span className="font-medium">{p.name}</span>
+                <InjuryBadge status={p.injuryStatus} />
+                <span className="ml-2 text-xs text-slate-400">{p.team}</span>
+              </td>
+              <td className="px-3 py-2"><PosBadge pos={p.pos} /></td>
+              <td className="px-3 py-2 text-slate-500">{p.bye ?? '—'}</td>
+              <td className="px-3 py-2 text-slate-500">{p.adp ?? '—'}</td>
               <td className="px-3 py-2 text-right">
                 <Button
                   variant="outline"
@@ -507,7 +515,7 @@ function PlayersTable({
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-3 py-6 text-center text-slate-500">No players match your filters.</td>
+              <td colSpan={6} className="px-3 py-6 text-center text-slate-500">No players match your filters.</td>
             </tr>
           )}
         </tbody>
@@ -523,7 +531,7 @@ function RosterView({ state, humanIndex }: { state: any, humanIndex: number | nu
   if (!state) return null
   const req = settings.roster
 
-  type Slot = { key:string; label:string; filled?: Player }
+  type Slot = { key:string; label:string; filled?: { name:string; pos:string } }
   const slots: Slot[] = []
   const add = (k: keyof typeof req, label?:string) => {
     for (let i = 0; i < (req as any)[k]; i++) slots.push({ key: k, label: label ?? k })
@@ -533,8 +541,8 @@ function RosterView({ state, humanIndex }: { state: any, humanIndex: number | nu
   const teamPicks = (state.picks as any[])
     .filter((p) => p.teamIndex === humanIndex)
     .sort((a,b) => a.overall - b.overall)
-    .map(p => (playersData as Player[]).find(pp => pp.id === p.playerId))
-    .filter(Boolean) as Player[]
+    .map(p => PLAYER_MAP[p.playerId])
+    .filter(Boolean)
 
   const takeFirstEmpty = (k:string) => slots.find(s => s.key === k && !s.filled)
   const isFlexEligible = (pos:string) => pos==='RB' || pos==='WR' || pos==='TE'

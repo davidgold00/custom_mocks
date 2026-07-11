@@ -1,47 +1,58 @@
-# Mock Drafter — Front-End MVP
+# Mock Drafter — 2026 Fantasy Football Draft Simulator
 
-This is a **front-end only** React + TypeScript + Tailwind UI for a customizable fantasy football mock draft simulator. It includes:
+A customizable mock draft simulator built around **your rankings**. Pick a live public
+ranking (real-market ADP or expert ranks) as a base, reshape it into your own board, and
+practice against bots that draft off that board — reaching, sniping, and panicking like
+real league mates, so you can rehearse the worst case before draft night.
 
-- League setup (teams, rounds, roster requirements)
-- Bot configuration (presets + sliders for QB timing, positional emphasis, team-needs sensitivity, risk, randomness, K/DST timing, favorites)
-- Draft room with a **client-side rule-based** engine (for demo)
-- Results page with **Export JSON**
+## Player data (2026 season)
 
-> Notes
-> - Sample players are bundled at `src/data/players.json` (small list). Replace with your own ADP/rankings later.
-> - This is a local simulation for demo purposes. No backend or real Sleeper integration yet.
+Player data is **fetched live from public sources** and bundled as a snapshot at
+`src/data/rankings-2026.json`:
 
-## Quick Start
+- **Fantasy Football Calculator** — market ADP from real mock drafts (PPR, Half PPR,
+  Standard, Superflex/2QB)
+- **ESPN Fantasy** — live ADP across ESPN leagues + staff PPR ranks, injury status
+
+Refresh anytime (takes ~5 seconds):
 
 ```bash
-# inside this folder
-npm i
-npm run dev
+npm run update-data
 ```
 
-Open http://localhost:5173
+The snapshot records when it was fetched; the UI shows the freshness date in the header,
+Dashboard, and Rankings page. Re-run before your draft for the latest ADP.
 
-## Integrating Real Data
+## Quick start
 
-1. Replace `src/data/players.json` with a larger list:
-   ```ts
-   interface Player { id: string; name: string; team: string; pos: 'QB'|'RB'|'WR'|'TE'|'K'|'DST'; adp: number }
-   ```
-2. Keep it sorted by ascending ADP for best results.
+```bash
+npm i
+npm run dev        # http://localhost:5173
+```
 
-## Where the Logic Lives
+## How it works
 
-- `src/lib/draftEngine.ts` — rule-based pick logic (K/DST delay, team needs, positional emphasis, QB timing, risk, favorites, randomness).
-- `src/store.ts` — Zustand store for settings, bots, and draft state.
+1. **Rankings** — choose a base source, then drag players (or click a rank number to
+   type a new one) to build your board. Edits persist locally.
+2. **League settings** — teams, rounds, roster slots.
+3. **Bots** — per-seat personalities (QB timing, positional emphasis, risk, chaos,
+   favorites). Presets like Zero-RB or Chaotic materialize real slider values.
+4. **Draft room** — claim a seat and draft. Bots pick off *your* board with seeded
+   randomness: every sim plays out differently, but the same seed replays identically.
 
-## Roadmap Hooks (left as TODOs for back-end integration)
+## Where the logic lives
 
-- Wire league & player data loaders
-- WebSocket draft updates
-- Export CSV, shareable links
-- Per-pick explanations (why the bot picked a player)
-- Draft recap charts (requires real data volume)
+- `scripts/update-data.mjs` — fetches + merges the public sources into the snapshot
+- `src/lib/rankings.ts` — loads the snapshot, builds the active board (base + your edits)
+- `src/lib/draftEngine.ts` — bot pick logic (needs, gates, personality, seeded noise)
+- `src/store.ts` — persisted settings, bots, and ranking preferences (Zustand)
+
+## Deploy
+
+Built for Cloudflare Pages (`wrangler.toml`); `functions/api/mocks.ts` provides optional
+KV-backed draft-room sharing.
 
 ## License
 
-For internal MVP/demo purposes only. Replace data sources with licensed feeds before any public release.
+Internal MVP. ADP/rankings data comes from public endpoints — verify licensing before any
+commercial release.
