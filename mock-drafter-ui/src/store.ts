@@ -8,6 +8,8 @@ import type {
   Preset,
   RankingsPrefs,
   RosterRequirements,
+  SavedBotConfig,
+  SavedRanking,
 } from '@/types'
 import { PRESET_VALUES } from '@/lib/presets'
 
@@ -109,6 +111,10 @@ const DEFAULT_RANKINGS: RankingsPrefs = {
   updatedAt: null,
 }
 
+type Library = { rankings: SavedRanking[]; botConfigs: SavedBotConfig[] }
+const EMPTY_LIBRARY: Library = { rankings: [], botConfigs: [] }
+const genId = () => Math.random().toString(36).slice(2, 10)
+
 /* ---------------------- store ---------------------- */
 
 type UIState = {
@@ -119,11 +125,19 @@ type UIState = {
   humanIndex: number | null
   pickTimer: number
   rankings: RankingsPrefs
+  library: Library
 
   // rankings management
   setBaseSource: (id: string) => void
   setCustomOrder: (order: string[]) => void
   resetCustomOrder: () => void
+
+  // library (saved imports + bot setups)
+  saveRanking: (name: string, order: string[], note?: string) => SavedRanking
+  deleteRanking: (id: string) => void
+  saveBotConfig: (name: string) => void
+  applyBotConfig: (id: string) => void
+  deleteBotConfig: (id: string) => void
 
   // settings management
   setSettings: (p: Partial<LeagueSettings>) => void
@@ -149,6 +163,7 @@ export const useUI = create<UIState>()(
       humanIndex: null,
       pickTimer: 60,
       rankings: DEFAULT_RANKINGS,
+      library: EMPTY_LIBRARY,
 
       setBaseSource: (id) =>
         set({ rankings: { baseSourceId: id, customOrder: null, updatedAt: null } }),
@@ -161,6 +176,50 @@ export const useUI = create<UIState>()(
       resetCustomOrder: () =>
         set((s) => ({
           rankings: { ...s.rankings, customOrder: null, updatedAt: null },
+        })),
+
+      saveRanking: (name, order, note) => {
+        const saved: SavedRanking = { id: genId(), name, order, note, createdAt: new Date().toISOString() }
+        set((s) => ({ library: { ...s.library, rankings: [...s.library.rankings, saved] } }))
+        return saved
+      },
+
+      deleteRanking: (id) =>
+        set((s) => {
+          const library = { ...s.library, rankings: s.library.rankings.filter((r) => r.id !== id) }
+          // if the deleted import was the active base, fall back to the default source
+          const rankings = s.rankings.baseSourceId === `user:${id}` ? DEFAULT_RANKINGS : s.rankings
+          return { library, rankings }
+        }),
+
+      saveBotConfig: (name) =>
+        set((s) => ({
+          library: {
+            ...s.library,
+            botConfigs: [
+              ...s.library.botConfigs,
+              {
+                id: genId(), name, createdAt: new Date().toISOString(),
+                teams: s.settings.teams, bots: s.bots, globalBot: s.globalBot,
+              },
+            ],
+          },
+        })),
+
+      applyBotConfig: (id) =>
+        set((s) => {
+          const c = s.library.botConfigs.find((b) => b.id === id)
+          if (!c) return {}
+          return {
+            settings: { ...s.settings, teams: c.teams },
+            bots: c.bots.map((b) => migrateBot(b)),
+            globalBot: migrateBot(c.globalBot),
+          }
+        }),
+
+      deleteBotConfig: (id) =>
+        set((s) => ({
+          library: { ...s.library, botConfigs: s.library.botConfigs.filter((b) => b.id !== id) },
         })),
 
       setSettings: (p) => {
@@ -217,6 +276,7 @@ export const useUI = create<UIState>()(
       setHumanIndex: (i) => set({ humanIndex: i }),
     }),
     {
+      // legacy storage key — changing it would wipe users' saved bots/rankings
       name: 'mockdrafter-ui',
       version: 3,
       migrate: (state: any) => {
@@ -224,6 +284,7 @@ export const useUI = create<UIState>()(
         if (state.bots) state.bots = state.bots.map((b: any) => migrateBot(b))
         if (state.globalBot) state.globalBot = migrateBot(state.globalBot)
         if (!state.rankings) state.rankings = DEFAULT_RANKINGS
+        if (!state.library) state.library = EMPTY_LIBRARY
         return state
       },
       partialize: (s) => ({
@@ -231,6 +292,7 @@ export const useUI = create<UIState>()(
         bots: s.bots,
         globalBot: s.globalBot,
         rankings: s.rankings,
+        library: s.library,
       }),
     }
   )

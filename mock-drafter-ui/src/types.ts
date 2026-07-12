@@ -8,6 +8,7 @@ export interface Player {
   pos: Position
   bye: number | null
   injuryStatus?: string | null
+  rookie?: boolean
 }
 
 /** A player placed on a ranking board (user's or a source's) */
@@ -17,13 +18,38 @@ export interface RankedPlayer extends Player {
   stdev?: number | null
 }
 
+export type SourceFormat = 'PPR' | 'HALF' | 'STD' | 'SF' | 'ANY'
+
 export interface RankingSourceMeta {
   id: string
   label: string
   provider: string
   kind: string
+  format: SourceFormat
+  dynasty: boolean
   detail: string
   coverage: number
+  /** date the source's data is from (its own reported date, else our fetch time) */
+  asOf?: string
+}
+
+/** A user-imported ranking list (from Excel/CSV/link), stored in the local library */
+export interface SavedRanking {
+  id: string
+  name: string
+  createdAt: string
+  order: string[] // canonical player ids, best first
+  note?: string
+}
+
+/** A saved bot/league configuration, stored in the local library */
+export interface SavedBotConfig {
+  id: string
+  name: string
+  createdAt: string
+  teams: number
+  bots: BotProfile[]
+  globalBot: BotProfile
 }
 
 /** User's active board: which public source it's based on + their edits */

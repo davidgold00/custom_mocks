@@ -26,6 +26,18 @@ export function PosBadge({ pos }: { pos: Position }) {
   )
 }
 
+export function RookieBadge({ rookie }: { rookie?: boolean }) {
+  if (!rookie) return null
+  return (
+    <span
+      title="Rookie"
+      className="ml-1.5 inline-flex items-center rounded px-1 py-px text-[10px] font-bold bg-emerald-100 text-emerald-700"
+    >
+      R
+    </span>
+  )
+}
+
 export function InjuryBadge({ status }: { status?: string | null }) {
   if (!status || status === 'ACTIVE') return null
   const short =

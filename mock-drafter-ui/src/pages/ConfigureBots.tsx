@@ -118,7 +118,11 @@ type LocalState = {
 const clamp = (n:number, lo:number, hi:number)=>Math.max(lo, Math.min(hi, n))
 
 export default function ConfigureBots() {
-  const { bots, setBot, setHuman, applyPreset, globalBot, setGlobalBot } = useUI()
+  const {
+    bots, setBot, setHuman, applyPreset, globalBot, setGlobalBot,
+    library, saveBotConfig, applyBotConfig, deleteBotConfig,
+  } = useUI()
+  const [selectedConfig, setSelectedConfig] = useState('')
 
   // Stage edits locally; nothing persists until Save
   const [local, setLocal] = useState<LocalState>({ globalBot, bots })
@@ -187,6 +191,57 @@ export default function ConfigureBots() {
 
   return (
     <div className="space-y-6">
+      {/* SAVED SETUPS */}
+      <Card>
+        <CardBody className="flex flex-wrap items-center gap-2 py-3">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Saved setups</span>
+          <Select value={selectedConfig} onChange={(e) => setSelectedConfig(e.target.value)}>
+            <option value="">{library.botConfigs.length ? 'Choose a setup…' : 'None saved yet'}</option>
+            {library.botConfigs.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} ({c.teams} teams)</option>
+            ))}
+          </Select>
+          <Button
+            variant="outline"
+            disabled={!selectedConfig}
+            onClick={() => {
+              if (!dirty || window.confirm('Loading a setup discards unsaved changes. Continue?')) {
+                applyBotConfig(selectedConfig)
+              }
+            }}
+          >
+            Load
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={!selectedConfig}
+            onClick={() => {
+              const c = library.botConfigs.find((b) => b.id === selectedConfig)
+              if (c && window.confirm(`Delete setup "${c.name}"?`)) {
+                deleteBotConfig(selectedConfig)
+                setSelectedConfig('')
+              }
+            }}
+          >
+            Delete
+          </Button>
+          <div className="ml-auto">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const name = window.prompt('Name this setup (e.g. "Home league 12-team"):')
+                if (name?.trim()) {
+                  if (dirty) save()
+                  saveBotConfig(name.trim())
+                }
+              }}
+            >
+              Save current as…
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+
       {/* GLOBAL DEFAULTS */}
       <Card>
         <CardHeader
@@ -351,12 +406,9 @@ export default function ConfigureBots() {
 
                   <div>
                     <label className="text-sm block mb-1">Favorite Players (comma-separated)</label>
-                    <Input
-                      placeholder="e.g., Travis Kelce, Upside RB B"
-                      value={(b.favorites || []).join(', ')}
-                      onChange={e => updateBot(i, {
-                        favorites: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)
-                      })}
+                    <FavoritesInput
+                      favorites={b.favorites || []}
+                      onCommit={(favorites) => updateBot(i, { favorites })}
                     />
                   </div>
                 </>
@@ -366,6 +418,41 @@ export default function ConfigureBots() {
         ))}
       </div>
     </div>
+  )
+}
+
+/**
+ * Favorites text box. The parsed array can't be the input's value directly —
+ * `split → trim → join` erases the comma/space you just typed. Keep raw text
+ * locally while typing and commit the parsed list on change.
+ */
+function FavoritesInput({
+  favorites,
+  onCommit,
+}: {
+  favorites: string[]
+  onCommit: (favorites: string[]) => void
+}) {
+  const [text, setText] = useState(favorites.join(', '))
+  const [focused, setFocused] = useState(false)
+
+  // reflect external changes (preset load, discard) only while not editing
+  useEffect(() => {
+    if (!focused) setText(favorites.join(', '))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favorites.join('|'), focused])
+
+  return (
+    <Input
+      placeholder="e.g., Travis Kelce, Upside RB B"
+      value={text}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChange={(e) => {
+        setText(e.target.value)
+        onCommit(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
+      }}
+    />
   )
 }
 

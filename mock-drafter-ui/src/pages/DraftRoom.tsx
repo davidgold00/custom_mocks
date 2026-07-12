@@ -4,10 +4,10 @@ import { useUI } from '@/store'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyPick, pickForBot, mulberry32 } from '@/lib/draftEngine'
 import { RankedPlayer, BotProfile } from '@/types'
-import { PLAYER_MAP, useBoard } from '@/lib/rankings'
+import { usePlayerMap, useBoard } from '@/lib/rankings'
 import { loadMock, saveMock, debounce } from '@/lib/api'
 
-type Panel = 'LOG' | 'ROSTER'
+type Panel = 'ROSTER' | 'LOG'
 const POS = ['ALL','QB','RB','WR','TE','K','DST'] as const
 
 // visible rows and cell sizing
@@ -52,7 +52,9 @@ export default function DraftRoom() {
   const [overall, setOverall] = useState(1)
   const [running, setRunning] = useState(false)
   const [log, setLog] = useState<string[]>([])
-  const [panel, setPanel] = useState<Panel>('LOG')
+  const [panel, setPanel] = useState<Panel>('ROSTER')
+  // which team's roster is shown; null = follow the user's seat
+  const [viewTeam, setViewTeam] = useState<number | null>(null)
 
   // human turn timer
   const [timeLeft, setTimeLeft] = useState<number>(pickTimer)
@@ -372,14 +374,28 @@ export default function DraftRoom() {
           </CardBody>
         </Card>
 
-        {/* Event Log / Roster */}
+        {/* Team roster / Event Log */}
         <Card>
           <CardHeader
-            title={panel === 'LOG' ? 'Event Log' : 'Roster'}
+            title={
+              panel === 'ROSTER' ? (
+                <Select
+                  value={viewTeam ?? humanIndex ?? 0}
+                  onChange={(e) => setViewTeam(Number(e.target.value))}
+                  className="font-semibold"
+                >
+                  {bots.map((b, i) => (
+                    <option key={i} value={i}>
+                      {b.name || `Team ${i + 1}`}{humanIndex === i ? ' (You)' : ''}
+                    </option>
+                  ))}
+                </Select>
+              ) : 'Event Log'
+            }
             action={
               <div className="flex gap-2">
-                <Button variant={panel === 'LOG' ? 'primary' : 'outline'} onClick={() => setPanel('LOG')}>Event Log</Button>
                 <Button variant={panel === 'ROSTER' ? 'primary' : 'outline'} onClick={() => setPanel('ROSTER')}>Roster</Button>
+                <Button variant={panel === 'LOG' ? 'primary' : 'outline'} onClick={() => setPanel('LOG')}>Log</Button>
               </div>
             }
           />
@@ -393,7 +409,7 @@ export default function DraftRoom() {
                 {complete && <div className="pt-3"><a href="/results" className="text-indigo-600 underline">View Results</a></div>}
               </>
             ) : (
-              <RosterView state={state} humanIndex={humanIndex} />
+              <RosterView state={state} teamIndex={viewTeam ?? humanIndex ?? 0} />
             )}
           </CardBody>
         </Card>
@@ -457,7 +473,7 @@ function Board({
 }
 
 function Picked({ playerId }: { playerId: string }) {
-  const data = PLAYER_MAP[playerId]
+  const data = usePlayerMap()[playerId]
   if (!data) return null
   return (
     <div className={`truncate border-l-2 pl-1.5 ${POS_SOLID[data.pos].replace('bg-', 'border-')}`}>
@@ -524,25 +540,28 @@ function PlayersTable({
   )
 }
 
-/* ===================== Roster panel (human) ===================== */
-function RosterView({ state, humanIndex }: { state: any, humanIndex: number | null }) {
+/* ===================== Roster panel (any team, Sleeper-style) ===================== */
+function RosterView({ state, teamIndex }: { state: any, teamIndex: number }) {
   const { settings } = useUI()
-  if (humanIndex == null) return <div className="text-sm text-slate-600">Claim a seat to see your roster.</div>
+  const playerMap = usePlayerMap()
   if (!state) return null
   const req = settings.roster
 
-  type Slot = { key:string; label:string; filled?: { name:string; pos:string } }
+  type Slot = { key:string; label:string; filled?: { name:string; pos:string; team:string; round:number; overall:number } }
   const slots: Slot[] = []
   const add = (k: keyof typeof req, label?:string) => {
     for (let i = 0; i < (req as any)[k]; i++) slots.push({ key: k, label: label ?? k })
   }
-  add('QB'); add('RB'); add('WR'); add('TE'); add('FLEX'); add('K'); add('DST'); add('BENCH','Bench')
+  add('QB'); add('RB'); add('WR'); add('TE'); add('FLEX'); add('K'); add('DST'); add('BENCH','BN')
 
   const teamPicks = (state.picks as any[])
-    .filter((p) => p.teamIndex === humanIndex)
+    .filter((p) => p.teamIndex === teamIndex)
     .sort((a,b) => a.overall - b.overall)
-    .map(p => PLAYER_MAP[p.playerId])
-    .filter(Boolean)
+    .map(p => {
+      const pl = playerMap[p.playerId]
+      return pl ? { ...pl, round: p.round, overall: p.overall } : null
+    })
+    .filter(Boolean) as NonNullable<Slot['filled']>[]
 
   const takeFirstEmpty = (k:string) => slots.find(s => s.key === k && !s.filled)
   const isFlexEligible = (pos:string) => pos==='RB' || pos==='WR' || pos==='TE'
@@ -567,20 +586,30 @@ function RosterView({ state, humanIndex }: { state: any, humanIndex: number | nu
     'bg-slate-400'
 
   return (
-    <div className="space-y-3 max-h-[420px] overflow-auto">
+    <div className="space-y-1.5 max-h-[440px] overflow-auto pr-0.5">
       {slots.map((s, idx) => (
-        <div key={idx} className="flex items-center justify-between border border-slate-200 rounded-xl px-3 py-2">
-          <div className="flex items-center gap-3">
-            <span className={`w-10 text-center text-xs font-semibold text-white rounded ${colorFor(s.key)}`}>{s.label}</span>
-            {s.filled ? (
-              <div>
-                <div className="text-sm font-medium">{s.filled.name}</div>
-                <div className="text-[11px] text-slate-500">{s.filled.pos}</div>
+        <div
+          key={idx}
+          className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 border ${
+            s.filled ? 'border-slate-200 bg-white' : 'border-dashed border-slate-200 bg-slate-50/60'
+          }`}
+        >
+          <span className={`w-9 shrink-0 text-center text-[10px] font-bold text-white rounded py-0.5 ${colorFor(s.key)} ${!s.filled && 'opacity-40'}`}>
+            {s.label}
+          </span>
+          {s.filled ? (
+            <>
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{s.filled.name}</div>
+                <div className="text-[10px] text-slate-400">{s.filled.pos} · {s.filled.team}</div>
               </div>
-            ) : (
-              <div className="text-sm text-slate-500">Empty</div>
-            )}
-          </div>
+              <span className="ml-auto shrink-0 text-[10px] text-slate-400 tabular-nums">
+                {s.filled.round}.{String(s.filled.overall - (s.filled.round - 1) * settings.teams).padStart(2, '0')}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-slate-400">—</span>
+          )}
         </div>
       ))}
     </div>

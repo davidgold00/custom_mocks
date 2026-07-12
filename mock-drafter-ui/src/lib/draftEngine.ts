@@ -86,15 +86,29 @@ function isAllowedThisRound(profile: BotProfile, round: number, p: RankedPlayer)
 }
 
 /**
- * Scores a candidate for a bot. Units are roughly "spots on the user's board":
- * a +10 term makes the bot treat the player as ranked 10 spots higher.
+ * How far below the best available player a bot may realistically reach,
+ * in board spots. Grows slowly with the round; scaled by the randomness
+ * slider (0–100). Round 1 is nearly locked — only randomness 100 can
+ * produce a pick from outside the projected first round.
+ */
+export function reachWindow(round: number, randomness: number): number {
+  const r = Math.max(0, Math.min(100, randomness))
+  if (round === 1) return r >= 100 ? 12 : Math.round(1 + r / 25) // 0→1 · 40→3 · 80→4 · 100→12
+  if (round <= 4) return Math.round(2 + r / 12) //                  0→2 · 40→5 · 100→10
+  if (round <= 8) return Math.round(3 + r / 8) //                   0→3 · 40→8 · 100→16
+  return Math.round(4 + r / 5) //                                   0→4 · 40→12 · 100→24
+}
+
+/**
+ * Scores a candidate for a bot (deterministic — no noise here; variance comes
+ * from the bounded sampling in pickForBot). Units are roughly "spots on the
+ * user's board": a +10 term makes the bot treat the player as ranked 10 spots higher.
  */
 function scorePlayer(
   p: RankedPlayer,
   profile: BotProfile,
   settings: LeagueSettings,
-  counts: Record<Position, number>,
-  rng: () => number
+  counts: Record<Position, number>
 ): number {
   let score = -p.rank
 
@@ -127,13 +141,6 @@ function scorePlayer(
   const risk = ((profile.riskTolerance ?? 40) - 50) / 50
   score += risk * (p.stdev ?? 2) * 2.5
 
-  // randomness: Gumbel noise → occasional reaches and sniped picks
-  const chaos = (profile.randomness ?? 10) * 0.4
-  if (chaos > 0) {
-    const u = Math.min(Math.max(rng(), 1e-9), 1 - 1e-9)
-    score += -Math.log(-Math.log(u)) * chaos
-  }
-
   return score
 }
 
@@ -159,8 +166,10 @@ export function pickForBot(opts: {
   const starters = unfilledStarters(settings, counts)
 
   let candidates: RankedPlayer[]
+  let forceFill = false
   if (starters.total >= roundsLeft) {
     // must fill starting lineup — restrict to needed positions, ignore gates
+    forceFill = true
     candidates = pool.filter(
       (p) => starters.needs.has(p.pos) || (starters.flexOpen && FLEX_ELIGIBLE.has(p.pos))
     )
@@ -170,18 +179,32 @@ export function pickForBot(opts: {
     if (candidates.length === 0) candidates = pool
   }
 
-  // realistic bots only consider the top of the board; chaos widens the window
-  const window = 24 + Math.floor((profile.randomness ?? 10) / 4)
-  candidates = candidates.slice(0, window)
-
-  let best: RankedPlayer | null = null
-  let bestScore = -Infinity
-  for (const p of candidates) {
-    const s = scorePlayer(p, profile, settings, counts, rng)
-    if (s > bestScore) {
-      bestScore = s
-      best = p
-    }
+  // hard realism cap: only players within reach of the best available are
+  // draftable at all (force-fill picks are exempt — grabbing your K late
+  // isn't a "reach", it's filling the lineup)
+  const randomness = profile.randomness ?? 10
+  if (!forceFill) {
+    const bestRank = candidates[0].rank // pool is rank-sorted
+    const window = reachWindow(round, randomness)
+    candidates = candidates.filter((p) => p.rank - bestRank <= window)
   }
-  return best
+  candidates = candidates.slice(0, 30)
+
+  // deterministic preference order (strategy, needs, favorites, risk)…
+  const scored = candidates
+    .map((p) => ({ p, s: scorePlayer(p, profile, settings, counts) }))
+    .sort((a, b) => b.s - a.s)
+
+  if (randomness <= 0 || scored.length === 1) return scored[0]?.p ?? null
+
+  // …then sample with a steep geometric taper: the top choice dominates,
+  // lower choices fade fast. Later rounds + higher randomness flatten it a bit.
+  const q = Math.min(0.7, 0.42 + randomness * 0.0015 + (round - 1) * 0.012)
+  let u = rng()
+  for (const { p } of scored) {
+    const w = 1 - q // P(take this one) at each step
+    if (u < w) return p
+    u = (u - w) / q // renormalize and move to the next choice
+  }
+  return scored[scored.length - 1].p
 }

@@ -1,27 +1,50 @@
 import { useMemo, useRef, useState } from 'react'
-import { Card, CardBody, CardHeader, Button, Input, Select } from '@/components/Card'
-import { PosBadge, InjuryBadge } from '@/components/PosBadge'
+import { Card, CardBody, CardHeader, Button, Input } from '@/components/Card'
+import { PosBadge, InjuryBadge, RookieBadge } from '@/components/PosBadge'
+import { ImportRankingsModal } from '@/components/ImportRankings'
 import { useUI } from '@/store'
-import { buildBoard, useBoard, SOURCES, SEASON, DATA_UPDATED } from '@/lib/rankings'
-import type { Position, RankedPlayer } from '@/types'
-import { ArrowDown, ArrowUp, CheckCircle2, GripVertical, RotateCcw, Database } from 'lucide-react'
+import { buildBoard, useBoard, useDataset, useSources, USER_SOURCE_PREFIX } from '@/lib/rankings'
+import { useData } from '@/lib/dataStore'
+import type { Position, RankedPlayer, SourceFormat } from '@/types'
+import {
+  ArrowDown, ArrowUp, CheckCircle2, GripVertical, RotateCcw,
+  RefreshCw, Upload, Trash2, FileSpreadsheet,
+} from 'lucide-react'
 
-const POS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DST'] as const
+const POSITIONS: Position[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
+const FORMATS: { id: SourceFormat | 'ALL'; label: string }[] = [
+  { id: 'ALL', label: 'All' },
+  { id: 'PPR', label: 'PPR' },
+  { id: 'HALF', label: 'Half PPR' },
+  { id: 'STD', label: 'Standard' },
+  { id: 'SF', label: 'Superflex' },
+]
 
 export default function Rankings() {
-  const { rankings, setBaseSource, setCustomOrder, resetCustomOrder } = useUI()
+  const { rankings, setBaseSource, setCustomOrder, resetCustomOrder, library, deleteRanking } = useUI()
+  const dataset = useDataset()
+  const sources = useSources()
   const board = useBoard()
+  const { refreshing, refreshError, refresh } = useData()
 
+  const [format, setFormat] = useState<SourceFormat | 'ALL'>('ALL')
+  const [rookiesOnly, setRookiesOnly] = useState(false)
   const [search, setSearch] = useState('')
-  const [pos, setPos] = useState<(typeof POS)[number]>('ALL')
+  const [posSel, setPosSel] = useState<Set<Position>>(new Set())
+  const [importing, setImporting] = useState(false)
   const dragFrom = useRef<number | null>(null)
 
-  // where each player sits in the untouched base source (for showing your edits)
+  const visibleSources = useMemo(
+    () => sources.filter((s) => format === 'ALL' || s.format === format || s.format === 'ANY'),
+    [sources, format],
+  )
+
+  // where each player sits in the untouched base (for showing your edits)
   const sourceRank = useMemo(() => {
     const m = new Map<string, number>()
-    buildBoard(rankings.baseSourceId, null).forEach((p) => m.set(p.id, p.rank))
+    buildBoard(dataset, library.rankings, rankings.baseSourceId, null).forEach((p) => m.set(p.id, p.rank))
     return m
-  }, [rankings.baseSourceId])
+  }, [dataset, library.rankings, rankings.baseSourceId])
 
   const edited = rankings.customOrder !== null
   const editedCount = useMemo(
@@ -29,19 +52,26 @@ export default function Rankings() {
     [board, sourceRank, edited],
   )
 
-  const filtering = search.trim() !== '' || pos !== 'ALL'
+  const filtering = search.trim() !== '' || posSel.size > 0 || rookiesOnly
   const visible = useMemo(() => {
     const s = search.trim().toLowerCase()
     return board.filter(
-      (p) => (pos === 'ALL' || p.pos === pos) && (!s || p.name.toLowerCase().includes(s)),
+      (p) =>
+        (!rookiesOnly || p.rookie) &&
+        (posSel.size === 0 || posSel.has(p.pos)) &&
+        (!s || p.name.toLowerCase().includes(s)),
     )
-  }, [board, search, pos])
+  }, [board, search, posSel, rookiesOnly])
+
+  function togglePos(p: Position) {
+    setPosSel((prev) => {
+      const next = new Set(prev)
+      next.has(p) ? next.delete(p) : next.add(p)
+      return next
+    })
+  }
 
   /* ---------- reorder operations (always on the full board) ---------- */
-
-  function commit(order: string[]) {
-    setCustomOrder(order)
-  }
 
   function moveTo(playerId: string, targetRank: number) {
     const order = board.map((p) => p.id)
@@ -51,7 +81,7 @@ export default function Rankings() {
     if (to === from) return
     order.splice(from, 1)
     order.splice(to, 0, playerId)
-    commit(order)
+    setCustomOrder(order)
   }
 
   function nudge(playerId: string, dir: -1 | 1) {
@@ -70,50 +100,132 @@ export default function Rankings() {
     resetCustomOrder()
   }
 
+  const updated = new Date(dataset.fetchedAt)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">{SEASON} Player Rankings</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{dataset.season} Player Rankings</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Pick a public ranking as your base, then drag players to build your own board.
-            Bots draft off this board.
+            Pick a base, reshape it, or import your own. Bots draft off this board.
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 text-xs font-medium">
-          <Database className="w-3.5 h-3.5" />
-          Live {SEASON} data · updated {DATA_UPDATED.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">
+            Updated {updated.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{' '}
+            {updated.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+          </span>
+          <Button variant="outline" onClick={() => refresh(true)} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing…' : 'Refresh data'}
+          </Button>
+          <Button variant="primary" onClick={() => setImporting(true)}>
+            <Upload className="w-4 h-4 mr-1.5" /> Import
+          </Button>
+        </div>
+      </div>
+
+      {refreshError && (
+        <div className="rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-3 py-2">
+          Refresh failed: {refreshError} — showing the last good data instead.
+        </div>
+      )}
+
+      {/* filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        {FORMATS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => setFormat(f.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+              format === f.id ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        <div className="w-px h-5 bg-slate-200 mx-1" />
+        <button
+          type="button"
+          onClick={() => setRookiesOnly((v) => !v)}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+            rookiesOnly ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+          }`}
+        >
+          Rookies only
+        </button>
       </div>
 
       {/* source picker */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {SOURCES.map((s) => {
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+        {visibleSources.map((s) => {
           const active = s.id === rankings.baseSourceId
           return (
             <button
               key={s.id}
               type="button"
               onClick={() => switchSource(s.id)}
-              className={`text-left rounded-2xl border p-4 transition ${
+              className={`text-left rounded-xl border p-3 transition ${
                 active
                   ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/20'
                   : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  {s.kind}
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 truncate">
+                  {s.kind}{s.dynasty && ' · Dynasty'}
                 </span>
-                {active && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
+                {active && <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />}
               </div>
-              <div className="font-semibold text-sm mt-1">{s.label}</div>
-              <div className="text-xs text-slate-500 mt-1">{s.detail}</div>
-              <div className="text-[11px] text-slate-400 mt-2">
-                {s.provider} · {s.coverage} players ranked
+              <div className="font-semibold text-[13px] mt-0.5 leading-tight">{s.label}</div>
+              <div className="text-[11px] text-slate-500 mt-1 truncate" title={s.detail}>{s.detail}</div>
+              <div className="text-[10px] text-slate-400 mt-1">
+                {s.provider} · {s.coverage} players · data{' '}
+                {new Date(s.asOf ?? dataset.fetchedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
               </div>
             </button>
+          )
+        })}
+
+        {/* user imports */}
+        {library.rankings.map((r) => {
+          const id = USER_SOURCE_PREFIX + r.id
+          const active = id === rankings.baseSourceId
+          return (
+            <div
+              key={id}
+              className={`relative text-left rounded-xl border p-3 transition cursor-pointer ${
+                active
+                  ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/20'
+                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+              }`}
+              onClick={() => switchSource(id)}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500 inline-flex items-center gap-1">
+                  <FileSpreadsheet className="w-3 h-3" /> Your import
+                </span>
+                {active && <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />}
+              </div>
+              <div className="font-semibold text-[13px] mt-0.5 leading-tight">{r.name}</div>
+              <div className="text-[10px] text-slate-400 mt-1">
+                {r.order.length} players · {new Date(r.createdAt).toLocaleDateString()}
+              </div>
+              <button
+                type="button"
+                title="Delete import"
+                className="absolute bottom-2 right-2 p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (window.confirm(`Delete "${r.name}"?`)) deleteRanking(r.id)
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )
         })}
       </div>
@@ -137,13 +249,38 @@ export default function Rankings() {
                 placeholder="Search player…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-44"
+                className="w-40"
               />
-              <Select value={pos} onChange={(e) => setPos(e.target.value as any)}>
-                {POS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </Select>
+              <div className="flex items-center gap-1">
+                {POSITIONS.map((p) => {
+                  const on = posSel.has(p)
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => togglePos(p)}
+                      title={on ? `Hide ${p}` : `Show only selected positions`}
+                      className={`px-2 py-1 rounded-md text-[11px] font-bold transition ${
+                        on
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                })}
+                {posSel.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPosSel(new Set())}
+                    className="px-1.5 py-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+                    title="Clear position filter"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
               <Button variant="outline" onClick={reset} disabled={!edited}>
                 <RotateCcw className="w-4 h-4 mr-1.5" /> Reset
               </Button>
@@ -201,6 +338,8 @@ export default function Rankings() {
           </div>
         </CardBody>
       </Card>
+
+      {importing && <ImportRankingsModal onClose={() => setImporting(false)} />}
     </div>
   )
 }
@@ -233,6 +372,7 @@ function Row({
       </td>
       <td className="px-3 py-1.5">
         <span className="font-medium">{p.name}</span>
+        <RookieBadge rookie={p.rookie} />
         <InjuryBadge status={p.injuryStatus} />
         <span className="ml-2 text-xs text-slate-400">{p.team}</span>
       </td>
@@ -248,20 +388,10 @@ function Row({
       </td>
       <td className="px-3 py-1.5">
         <div className="flex justify-end gap-1">
-          <button
-            type="button"
-            onClick={() => onNudge(-1)}
-            className="p-1 rounded hover:bg-slate-200 text-slate-500"
-            title="Move up"
-          >
+          <button type="button" onClick={() => onNudge(-1)} className="p-1 rounded hover:bg-slate-200 text-slate-500" title="Move up">
             <ArrowUp className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => onNudge(1)}
-            className="p-1 rounded hover:bg-slate-200 text-slate-500"
-            title="Move down"
-          >
+          <button type="button" onClick={() => onNudge(1)} className="p-1 rounded hover:bg-slate-200 text-slate-500" title="Move down">
             <ArrowDown className="w-4 h-4" />
           </button>
         </div>

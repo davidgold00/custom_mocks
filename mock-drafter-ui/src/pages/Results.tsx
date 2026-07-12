@@ -1,11 +1,12 @@
 import { Card, CardBody, CardHeader, Button } from '@/components/Card'
 import { PosBadge } from '@/components/PosBadge'
 import { useUI } from '@/store'
-import { PLAYER_MAP } from '@/lib/rankings'
+import { usePlayerMap } from '@/lib/rankings'
 import { Download } from 'lucide-react'
 
 export default function Results() {
   const { draft, settings, bots } = useUI()
+  const PLAYER_MAP = usePlayerMap()
   const rosters = draft?.rosters ?? []
 
   function exportJson() {
@@ -21,7 +22,7 @@ export default function Results() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'mock-results.json'
+    a.download = 'boardroom-results.json'
     a.click()
     URL.revokeObjectURL(url)
   }

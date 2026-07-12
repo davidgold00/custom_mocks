@@ -9,6 +9,7 @@ import SetupLeague from './pages/SetupLeague'
 import ConfigureBots from './pages/ConfigureBots'
 import DraftRoom from './pages/DraftRoom'
 import Results from './pages/Results'
+import About from './pages/About'
 
 const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
       { path: 'bots', element: <ConfigureBots /> },
       { path: 'draft', element: <DraftRoom /> },
       { path: 'results', element: <Results /> },
+      { path: 'about', element: <About /> },
     ],
   },
 ])

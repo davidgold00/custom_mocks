@@ -1,14 +1,20 @@
 import { Link } from 'react-router-dom'
 import { Card, CardBody, Button } from '@/components/Card'
 import { useUI } from '@/store'
-import { useBoard, SOURCES, SEASON, DATA_UPDATED } from '@/lib/rankings'
+import { useBoard, useDataset, useSources, USER_SOURCE_PREFIX } from '@/lib/rankings'
 import { ListOrdered, Settings, SlidersHorizontal, Play, Database, ArrowRight } from 'lucide-react'
 
 export default function Dashboard() {
-  const { settings, bots, rankings } = useUI()
+  const { settings, bots, rankings, library } = useUI()
+  const dataset = useDataset()
   const board = useBoard()
-  const source = SOURCES.find((s) => s.id === rankings.baseSourceId)
+  const sources = useSources()
+  const sourceLabel = rankings.baseSourceId.startsWith(USER_SOURCE_PREFIX)
+    ? library.rankings.find((r) => USER_SOURCE_PREFIX + r.id === rankings.baseSourceId)?.name ?? 'Your import'
+    : sources.find((s) => s.id === rankings.baseSourceId)?.label ?? '—'
   const edited = rankings.customOrder !== null
+  const SEASON = dataset.season
+  const DATA_UPDATED = new Date(dataset.fetchedAt)
 
   const steps = [
     {
@@ -16,8 +22,8 @@ export default function Dashboard() {
       icon: <ListOrdered className="w-5 h-5" />,
       title: '1 · Set your rankings',
       desc: edited
-        ? `Custom board based on ${source?.label ?? 'a public source'}`
-        : `Following ${source?.label ?? 'a public source'} — customize it to match your cheat sheet`,
+        ? `Custom board based on ${sourceLabel}`
+        : `Following ${sourceLabel} — customize it to match your cheat sheet`,
       cta: 'Open Rankings',
     },
     {
@@ -99,7 +105,7 @@ export default function Dashboard() {
       {/* current setup summary */}
       <Card>
         <CardBody className="flex flex-wrap gap-x-10 gap-y-3 text-sm">
-          <Stat label="Base rankings" value={source?.label ?? '—'} />
+          <Stat label="Base rankings" value={sourceLabel} />
           <Stat label="Your edits" value={edited ? 'Custom board' : 'None yet'} />
           <Stat label="League" value={`${settings.teams} teams · ${settings.rounds} rounds`} />
           <Stat
