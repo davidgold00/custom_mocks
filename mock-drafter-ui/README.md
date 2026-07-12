@@ -44,7 +44,34 @@ the rest — the merge is resilient by design.
 
 ```bash
 npm i
-npm run dev        # http://localhost:5173
+npm run db:migrate   # one-time: create the local user database (D1/SQLite)
+npm run dev:full     # full app with accounts at http://localhost:8788
+npm run dev          # UI-only (vite HMR, http://localhost:5173) — sign-in won't work here
+```
+
+## User accounts
+
+BoardRoom requires an account (username + password; email/phone deliberately not
+collected yet). All data is stored in **Cloudflare D1** (`migrations/0001_init.sql`):
+
+- `users` — PBKDF2-SHA256 password hashes (150k iterations, per-user salt, stored
+  iteration count so cost can be raised later)
+- `sessions` — 30-day sessions; the DB stores only a SHA-256 of the token, the browser
+  holds it in an httpOnly/Secure/SameSite cookie
+- `bot_configs`, `imported_rankings`, `drafts`, `user_prefs` — all foreign-keyed to
+  users with cascade delete, indexed on every lookup path, JSON payloads size-capped
+  and row-capped per user
+
+Completed drafts save to the account automatically and are browsable on the Results
+page. On first sign-in, any pre-account data on the device (imports, bot setups) is
+migrated up to the account; after that the server is the source of truth and working
+state syncs in the background.
+
+### Deploying the database
+
+```bash
+npx wrangler d1 create boardroom-db   # once; paste database_id into wrangler.toml
+npm run db:migrate:prod               # apply migrations to production
 ```
 
 ## How it works

@@ -6,6 +6,8 @@ import { applyPick, pickForBot, mulberry32 } from '@/lib/draftEngine'
 import { RankedPlayer, BotProfile } from '@/types'
 import { usePlayerMap, useBoard } from '@/lib/rankings'
 import { loadMock, saveMock, debounce } from '@/lib/api'
+import { api, trySync } from '@/lib/userApi'
+import { useAuth } from '@/lib/authStore'
 
 type Panel = 'ROSTER' | 'LOG'
 const POS = ['ALL','QB','RB','WR','TE','K','DST'] as const
@@ -176,6 +178,25 @@ export default function DraftRoom() {
   const started = (state?.picks.length ?? 0) > 0
   const totalPicks = settings.rounds * settings.teams
   const complete = state && state.picks.length >= totalPicks
+
+  // save the finished draft to the user's account, once per completion
+  const savedDraftRef = useRef(false)
+  useEffect(() => {
+    if (!complete || savedDraftRef.current || !state) return
+    savedDraftRef.current = true
+    trySync(
+      api
+        .saveDraft({
+          name: `${settings.teams}-team draft, ${new Date().toLocaleDateString()}`,
+          settings,
+          teams: bots.map((b, i) => ({ name: b.name || `Team ${i + 1}`, isHuman: humanIndex === i })),
+          picks: state.picks,
+        })
+        .then((d) => useAuth.getState().addDraftMeta({ ...d, createdAt: new Date().toISOString() })),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complete])
+  useEffect(() => { if (!started) savedDraftRef.current = false }, [started])
 
   // whose turn
   const pickIdxInRound = (overall - 1) % settings.teams

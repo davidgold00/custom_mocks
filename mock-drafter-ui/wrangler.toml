@@ -2,9 +2,20 @@
 name = "mock-drafter-ui"
 compatibility_date = "2024-11-01"
 
+pages_build_output_dir = "dist"
+
 # KV bindings MUST use non-empty strings for ids
 [[kv_namespaces]]
 binding = "MOCKS_KV"
 # For local dev you can use placeholders; wrangler will stub the KV
 id = "mockdrafter_kv_prod"
 preview_id = "mockdrafter_kv_preview"
+
+# User database (accounts, sessions, saved drafts/configs/rankings).
+# Before deploying: `npx wrangler d1 create boardroom-db`, paste the real
+# database_id here, then `npm run db:migrate:prod`.
+[[d1_databases]]
+binding = "DB"
+database_name = "boardroom-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

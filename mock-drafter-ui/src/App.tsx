@@ -1,15 +1,29 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import { Trophy, Settings, Users, PlayCircle, BarChart3, SlidersHorizontal, ListOrdered, Info } from 'lucide-react'
+import { Trophy, Settings, Users, PlayCircle, BarChart3, SlidersHorizontal, ListOrdered, Info, LogOut, UserCircle2 } from 'lucide-react'
 import { useDataset } from '@/lib/rankings'
 import { useData } from '@/lib/dataStore'
+import { useAuth } from '@/lib/authStore'
+import AuthPage from '@/pages/Auth'
 
 export default function App() {
   const dataset = useDataset()
   const autoRefresh = useData((s) => s.autoRefresh)
+  const { status, init } = useAuth()
+
+  useEffect(() => { void init() }, [init])
 
   // rankings move daily with news — quietly pull the latest on open if stale
   useEffect(() => { autoRefresh() }, [autoRefresh])
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">
+        Loading…
+      </div>
+    )
+  }
+  if (status === 'anon') return <AuthPage />
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -31,6 +45,7 @@ export default function App() {
             <Tab to="/results" label="Results" icon={<BarChart3 className="w-4 h-4" />} />
             <SettingsDropdown />
             <Tab to="/about" label="About" icon={<Info className="w-4 h-4" />} />
+            <UserMenu />
           </nav>
         </div>
       </header>
@@ -60,6 +75,26 @@ function Tab({ to, label, icon }: { to: string; label: string; icon?: React.Reac
     >
       <span className="inline-flex items-center gap-2">{icon}{label}</span>
     </NavLink>
+  )
+}
+
+function UserMenu() {
+  const { user, logout } = useAuth()
+  return (
+    <div className="flex items-center gap-1 pl-2 ml-1 border-l border-slate-200">
+      <span className="inline-flex items-center gap-1.5 text-sm text-slate-600 font-medium px-1">
+        <UserCircle2 className="w-4 h-4 text-slate-400" />
+        {user?.username}
+      </span>
+      <button
+        type="button"
+        onClick={() => void logout()}
+        title="Sign out"
+        className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition"
+      >
+        <LogOut className="w-4 h-4" />
+      </button>
+    </div>
   )
 }
 

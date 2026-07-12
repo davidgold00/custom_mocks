@@ -1,4 +1,4 @@
-/// <reference types="@cloudflare/workers-types/latest" />
+/// <reference types="@cloudflare/workers-types" />
 
 /**
  * GET /api/rankings        → dataset (KV-cached, rebuilt when older than 6h)

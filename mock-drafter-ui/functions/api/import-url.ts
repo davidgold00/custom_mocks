@@ -1,4 +1,4 @@
-/// <reference types="@cloudflare/workers-types/latest" />
+/// <reference types="@cloudflare/workers-types" />
 
 /**
  * POST /api/import-url  { url }

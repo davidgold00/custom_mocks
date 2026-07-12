@@ -12,6 +12,7 @@ import type {
   SavedRanking,
 } from '@/types'
 import { PRESET_VALUES } from '@/lib/presets'
+import { api, trySync } from '@/lib/userApi'
 
 /* ---------------------- defaults ---------------------- */
 
@@ -181,30 +182,29 @@ export const useUI = create<UIState>()(
       saveRanking: (name, order, note) => {
         const saved: SavedRanking = { id: genId(), name, order, note, createdAt: new Date().toISOString() }
         set((s) => ({ library: { ...s.library, rankings: [...s.library.rankings, saved] } }))
+        trySync(api.saveRanking(saved))
         return saved
       },
 
-      deleteRanking: (id) =>
+      deleteRanking: (id) => {
         set((s) => {
           const library = { ...s.library, rankings: s.library.rankings.filter((r) => r.id !== id) }
           // if the deleted import was the active base, fall back to the default source
           const rankings = s.rankings.baseSourceId === `user:${id}` ? DEFAULT_RANKINGS : s.rankings
           return { library, rankings }
-        }),
+        })
+        trySync(api.deleteRanking(id))
+      },
 
       saveBotConfig: (name) =>
-        set((s) => ({
-          library: {
-            ...s.library,
-            botConfigs: [
-              ...s.library.botConfigs,
-              {
-                id: genId(), name, createdAt: new Date().toISOString(),
-                teams: s.settings.teams, bots: s.bots, globalBot: s.globalBot,
-              },
-            ],
-          },
-        })),
+        set((s) => {
+          const saved = {
+            id: genId(), name, createdAt: new Date().toISOString(),
+            teams: s.settings.teams, bots: s.bots, globalBot: s.globalBot,
+          }
+          trySync(api.saveBotConfig(saved))
+          return { library: { ...s.library, botConfigs: [...s.library.botConfigs, saved] } }
+        }),
 
       applyBotConfig: (id) =>
         set((s) => {
@@ -217,10 +217,12 @@ export const useUI = create<UIState>()(
           }
         }),
 
-      deleteBotConfig: (id) =>
+      deleteBotConfig: (id) => {
         set((s) => ({
           library: { ...s.library, botConfigs: s.library.botConfigs.filter((b) => b.id !== id) },
-        })),
+        }))
+        trySync(api.deleteBotConfig(id))
+      },
 
       setSettings: (p) => {
         const prev = get().settings

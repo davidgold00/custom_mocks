@@ -6,7 +6,7 @@
 
     "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
 
-    "types": ["node", "@cloudflare/workers-types/latest"],
+    "types": ["node", "@cloudflare/workers-types"],
 
     "strict": true,
     "skipLibCheck": true,
