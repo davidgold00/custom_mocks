@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Trophy, Settings, Users, PlayCircle, BarChart3, SlidersHorizontal, ListOrdered, Info, LogOut, UserCircle2 } from 'lucide-react'
 import { useDataset } from '@/lib/rankings'
 import { useData } from '@/lib/dataStore'
-import { useAuth } from '@/lib/authStore'
+import { useAuth, AUTH_BYPASS } from '@/lib/authStore'
 import AuthPage from '@/pages/Auth'
 
 export default function App() {
@@ -85,6 +85,11 @@ function UserMenu() {
       <span className="inline-flex items-center gap-1.5 text-sm text-slate-600 font-medium px-1">
         <UserCircle2 className="w-4 h-4 text-slate-400" />
         {user?.username}
+        {AUTH_BYPASS && (
+          <span className="rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+            no auth
+          </span>
+        )}
       </span>
       <button
         type="button"

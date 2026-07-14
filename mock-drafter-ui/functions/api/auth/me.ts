@@ -1,6 +1,10 @@
-import { type Env, json, getUser, unauthorized } from '../../_lib/auth'
+import { type Env, json, getUser, unauthorized, dbErrorResponse } from '../../_lib/auth'
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
-  const user = await getUser(request, env.DB)
-  return user ? json({ user }) : unauthorized()
+  try {
+    const user = await getUser(request, env.DB)
+    return user ? json({ user }) : unauthorized()
+  } catch (e) {
+    return dbErrorResponse(e)
+  }
 }

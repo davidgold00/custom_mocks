@@ -56,12 +56,15 @@ export async function createSession(db: D1Database, userId: string) {
   return { token, expires }
 }
 
-export function sessionCookie(token: string, expires: string) {
-  return `${COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(expires).toUTCString()}`
+/** `Secure` only over https — Safari drops Secure cookies on http://localhost */
+const isHttps = (request: Request) => new URL(request.url).protocol === 'https:'
+
+export function sessionCookie(request: Request, token: string, expires: string) {
+  return `${COOKIE}=${token}; Path=/; HttpOnly; ${isHttps(request) ? 'Secure; ' : ''}SameSite=Lax; Expires=${new Date(expires).toUTCString()}`
 }
 
-export const clearSessionCookie = () =>
-  `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+export const clearSessionCookie = (request: Request) =>
+  `${COOKIE}=; Path=/; HttpOnly; ${isHttps(request) ? 'Secure; ' : ''}SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
 
 function readCookie(request: Request): string | null {
   const m = (request.headers.get('Cookie') ?? '').match(new RegExp(`(?:^|;\\s*)${COOKIE}=([a-f0-9]+)`))
@@ -104,14 +107,27 @@ export const json = (data: unknown, status = 200, headers: Record<string, string
 
 export const unauthorized = () => json({ error: 'Not signed in.' }, 401)
 
+/** Turn raw D1 failures into actionable JSON instead of an HTML error page. */
+export function dbErrorResponse(e: unknown): Response {
+  const msg = e instanceof Error ? e.message : String(e)
+  if (/no such table/i.test(msg)) {
+    return json({ error: 'Local database not initialized — run `npm run db:migrate` and restart.' }, 500)
+  }
+  return json({ error: `Database error: ${msg}` }, 500)
+}
+
 /** wrapper for endpoints that require a signed-in user */
 export function requireUser(
   handler: (ctx: EventContext<Env, string, Record<string, unknown>>, user: User) => Promise<Response>,
 ): PagesFunction<Env> {
   return async (ctx) => {
-    const user = await getUser(ctx.request, ctx.env.DB)
-    if (!user) return unauthorized()
-    return handler(ctx, user)
+    try {
+      const user = await getUser(ctx.request, ctx.env.DB)
+      if (!user) return unauthorized()
+      return await handler(ctx, user)
+    } catch (e) {
+      return dbErrorResponse(e)
+    }
   }
 }
 

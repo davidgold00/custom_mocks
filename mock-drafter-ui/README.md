@@ -44,10 +44,17 @@ the rest — the merge is resilient by design.
 
 ```bash
 npm i
-npm run db:migrate   # one-time: create the local user database (D1/SQLite)
-npm run dev:full     # full app with accounts at http://localhost:8788
-npm run dev          # UI-only (vite HMR, http://localhost:5173) — sign-in won't work here
+npm run dev          # http://localhost:5173 — starts the UI, the API, and the local
+                     # database together (migrations apply automatically)
 ```
+
+Other modes:
+
+- `npm run dev:open` — **debugging without login**: skips the auth gate entirely
+  (fake local "dev" user, no account sync, amber "no auth" badge in the header).
+  Dev-only by construction — the bypass is stripped from production builds.
+- `npm run dev:full` — production build + API at :8788
+- `npm run dev:ui` — vite alone (account features answer with a clear error)
 
 ## User accounts
 

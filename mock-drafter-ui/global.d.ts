@@ -1,1 +1,1 @@
-/// <reference types="@cloudflare/workers-types/latest" />
+/// <reference types="@cloudflare/workers-types" />

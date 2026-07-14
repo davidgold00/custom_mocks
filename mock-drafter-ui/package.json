@@ -4,13 +4,16 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm:dev:api\" \"vite --port 5173\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "update-data": "node scripts/update-data.mjs",
     "dev:full": "npm run build && wrangler pages dev --port 8788",
     "db:migrate": "wrangler d1 migrations apply boardroom-db --local",
-    "db:migrate:prod": "wrangler d1 migrations apply boardroom-db --remote"
+    "db:migrate:prod": "wrangler d1 migrations apply boardroom-db --remote",
+    "dev:api": "( [ -d dist ] || npm run build ) && wrangler d1 migrations apply boardroom-db --local && wrangler pages dev --port 8788",
+    "dev:ui": "vite --port 5173",
+    "dev:open": "VITE_BYPASS_AUTH=1 vite --port 5173"
   },
   "dependencies": {
     "lucide-react": "^0.446.0",
@@ -28,6 +31,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^10.0.3",
     "postcss": "^8.4.45",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4",

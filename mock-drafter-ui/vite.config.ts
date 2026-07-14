@@ -77,4 +77,24 @@ function devApi(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tsconfigPaths(), devApi()],
+  server: {
+    // /api/rankings + /api/import-url are answered by devApi above; everything
+    // else under /api (auth, user data → D1) proxies to `wrangler pages dev`,
+    // which `npm run dev` starts alongside vite.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8788',
+        configure(proxy) {
+          proxy.on('error', (_err, _req, res) => {
+            if ('writeHead' in res && !res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({
+                error: 'Local API isn’t running. Start the app with `npm run dev` (it launches the API automatically) or `npm run dev:full`.',
+              }))
+            }
+          })
+        },
+      },
+    },
+  },
 })

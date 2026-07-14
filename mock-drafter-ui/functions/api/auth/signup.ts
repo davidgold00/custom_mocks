@@ -1,5 +1,5 @@
 import {
-  type Env, json, randomId, now, hashPassword, createSession, sessionCookie, validateCredentials,
+  type Env, json, randomId, now, hashPassword, createSession, sessionCookie, validateCredentials, dbErrorResponse,
 } from '../../_lib/auth'
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -14,20 +14,24 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (invalid) return json({ error: invalid }, 400)
   const username = body.username!.trim()
 
-  const exists = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first()
-  if (exists) return json({ error: 'That username is taken.' }, 409)
-
-  const { hash, salt, iters } = await hashPassword(body.password!)
-  const id = randomId()
   try {
-    await env.DB
-      .prepare('INSERT INTO users (id, username, pass_hash, pass_salt, pass_iters, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(id, username, hash, salt, iters, now(), now())
-      .run()
-  } catch {
-    return json({ error: 'That username is taken.' }, 409) // unique-race fallback
-  }
+    const exists = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first()
+    if (exists) return json({ error: 'That username is taken.' }, 409)
 
-  const { token, expires } = await createSession(env.DB, id)
-  return json({ user: { id, username } }, 201, { 'Set-Cookie': sessionCookie(token, expires) })
+    const { hash, salt, iters } = await hashPassword(body.password!)
+    const id = randomId()
+    try {
+      await env.DB
+        .prepare('INSERT INTO users (id, username, pass_hash, pass_salt, pass_iters, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(id, username, hash, salt, iters, now(), now())
+        .run()
+    } catch {
+      return json({ error: 'That username is taken.' }, 409) // unique-race fallback
+    }
+
+    const { token, expires } = await createSession(env.DB, id)
+    return json({ user: { id, username } }, 201, { 'Set-Cookie': sessionCookie(request, token, expires) })
+  } catch (e) {
+    return dbErrorResponse(e)
+  }
 }
