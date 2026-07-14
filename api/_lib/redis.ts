@@ -9,9 +9,11 @@ function getClient(): Redis {
   // pair or REST_API_URL/REST_API_TOKEN. Support both, plus legacy Vercel KV.
   const url = process.env.UPSTASH_REDIS_REST_URL
     ?? process.env.UPSTASH_REDIS_REST_API_URL
+    ?? process.env.UPSTASH_REDIS_REST_KV_REST_API_URL
     ?? process.env.KV_REST_API_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
     ?? process.env.UPSTASH_REDIS_REST_API_TOKEN
+    ?? process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN
     ?? process.env.KV_REST_API_TOKEN
   if (!url || !token) {
     throw new Error('Missing Redis configuration. Connect an Upstash Redis database to this Vercel project.')
