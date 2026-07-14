@@ -1,5 +1,5 @@
-import { sql } from '../_lib/db'
-import { json, requireUser } from '../_lib/auth'
+import { sql } from '../_lib/db.js'
+import { json, requireUser } from '../_lib/auth.js'
 
 /** GET /api/me/library: everything the client needs to hydrate after login */
 const handler = requireUser(async (request, user) => {

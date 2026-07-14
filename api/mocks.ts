@@ -2,7 +2,7 @@
  * Shareable draft-room snapshots (GET to load, POST to save), used by the
  * Draft Room's ?room= link sync. Storage: Upstash Redis.
  */
-import { redis } from './_lib/redis'
+import { redis } from './_lib/redis.js'
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })

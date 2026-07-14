@@ -6,7 +6,7 @@
  * Cache: Upstash Redis. The Vercel Marketplace integration injects
  * UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN when it is connected.
  */
-import { redis } from './_lib/redis'
+import { redis } from './_lib/redis.js'
 // @ts-ignore: plain ESM module shared with Node scripts
 import { buildDataset } from '../shared/sources.mjs'
 

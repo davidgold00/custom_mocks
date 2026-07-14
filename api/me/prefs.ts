@@ -1,5 +1,5 @@
-import { sql } from '../_lib/db'
-import { json, now, requireUser } from '../_lib/auth'
+import { sql } from '../_lib/db.js'
+import { json, now, requireUser } from '../_lib/auth.js'
 
 const MAX_BYTES = 64 * 1024
 

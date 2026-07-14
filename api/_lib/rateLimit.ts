@@ -1,4 +1,4 @@
-import { redis } from './redis'
+import { redis } from './redis.js'
 
 const hex = (buf: ArrayBuffer) =>
   [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')

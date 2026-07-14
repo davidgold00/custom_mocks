@@ -1,8 +1,8 @@
-import { sql } from '../_lib/db'
-import { isRateLimited } from '../_lib/rateLimit'
+import { sql } from '../_lib/db.js'
+import { isRateLimited } from '../_lib/rateLimit.js'
 import {
   json, now, hashPassword, safeEqual, createSession, sessionCookie, dbErrorResponse,
-} from '../_lib/auth'
+} from '../_lib/auth.js'
 
 async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)

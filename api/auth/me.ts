@@ -1,4 +1,4 @@
-import { json, getUser, unauthorized, dbErrorResponse } from '../_lib/auth'
+import { json, getUser, unauthorized, dbErrorResponse } from '../_lib/auth.js'
 
 async function handler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405)

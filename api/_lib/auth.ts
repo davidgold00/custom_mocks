@@ -3,7 +3,7 @@
  *  Storage: Neon Postgres, read from DATABASE_URL, which the Vercel
  *  Marketplace integration injects when the database is connected. */
 
-import { sql } from './db'
+import { sql } from './db.js'
 
 export type User = { id: string; username: string; created_at: string }
 
