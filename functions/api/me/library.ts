@@ -1,6 +1,6 @@
 import { json, requireUser } from '../../_lib/auth'
 
-/** GET /api/me/library — everything the client needs to hydrate after login */
+/** GET /api/me/library: everything the client needs to hydrate after login */
 export const onRequestGet = requireUser(async ({ env }, user) => {
   const [prefs, botConfigs, rankings, drafts] = await Promise.all([
     env.DB.prepare('SELECT prefs_json FROM user_prefs WHERE user_id = ?').bind(user.id).first<{ prefs_json: string }>(),

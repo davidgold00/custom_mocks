@@ -22,7 +22,7 @@ const DEFAULT_ROSTER: RosterRequirements = {
 
 // keep rounds simple; you can recompute elsewhere if you like
 const DEFAULT_SETTINGS: LeagueSettings = {
-  teams: 10,        // <— requested: default to 10
+  teams: 10,        // requested default: 10
   rounds: 15,
   roster: DEFAULT_ROSTER,
   snake: true,
@@ -278,7 +278,7 @@ export const useUI = create<UIState>()(
       setHumanIndex: (i) => set({ humanIndex: i }),
     }),
     {
-      // legacy storage key — changing it would wipe users' saved bots/rankings
+      // legacy storage key, changing it would wipe users' saved bots/rankings
       name: 'mockdrafter-ui',
       version: 3,
       migrate: (state: any) => {

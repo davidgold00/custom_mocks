@@ -5,7 +5,7 @@
  * GET /api/rankings?force=1 → rebuild now (the UI "Refresh data" button)
  * Falls back to stale cache if the live rebuild fails.
  */
-// @ts-ignore — plain ESM module shared with Node scripts
+// @ts-ignore: plain ESM module shared with Node scripts
 import { buildDataset } from '../../shared/sources.mjs'
 
 type Env = { MOCKS_KV: KVNamespace }

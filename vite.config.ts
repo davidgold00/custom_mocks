@@ -46,7 +46,7 @@ function devApi(): Plugin {
             try {
               r = await fetch(norm.url!, { headers: { 'User-Agent': 'BoardRoom/1.0' }, redirect: 'follow' })
             } catch {
-              return send(200, { ok: false, error: 'That link could not be reached — check it works in your browser.' })
+              return send(200, { ok: false, error: 'That link could not be reached. Check it works in your browser.' })
             }
             if (!r.ok) {
               return send(200, {
@@ -60,7 +60,7 @@ function devApi(): Plugin {
             if (buf.byteLength > MAX_BYTES) return send(200, { ok: false, error: 'File is too large (over 8 MB).' })
             const kind = classifyContent(r.headers.get('content-type') ?? '', norm.url!, buf)
             if (kind === 'html') return send(200, { ok: false, error: 'That link is a web page, not a rankings file. Look for a CSV/Excel export or download button on the site, or copy the table into a spreadsheet and upload it.' })
-            if (kind === 'unknown') return send(200, { ok: false, error: 'Unsupported file type — only CSV, TSV, or Excel (.xlsx/.xls) links work.' })
+            if (kind === 'unknown') return send(200, { ok: false, error: 'Unsupported file type. Only CSV, TSV, or Excel (.xlsx/.xls) links work.' })
             const name = norm.url!.split('/').pop()?.split('?')[0] || 'imported-rankings'
             if (kind === 'csv') return send(200, { ok: true, kind, name, text: Buffer.from(buf).toString('utf8') })
             return send(200, { ok: true, kind, name, base64: Buffer.from(buf).toString('base64') })

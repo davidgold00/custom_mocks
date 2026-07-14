@@ -3,7 +3,7 @@ import { json, now, randomId, requireUser } from '../../_lib/auth'
 const MAX_BYTES = 512 * 1024
 const MAX_ROWS = 200
 
-/** GET /api/me/drafts?id=… — full saved draft */
+/** GET /api/me/drafts?id=...: full saved draft */
 export const onRequestGet = requireUser(async ({ request, env }, user) => {
   const id = new URL(request.url).searchParams.get('id')
   if (!id) return json({ error: 'Missing id.' }, 400)
@@ -20,7 +20,7 @@ export const onRequestGet = requireUser(async ({ request, env }, user) => {
   })
 })
 
-/** POST /api/me/drafts — save a completed draft */
+/** POST /api/me/drafts: save a completed draft */
 export const onRequestPost = requireUser(async ({ request, env }, user) => {
   let body: { name?: string; settings?: unknown; teams?: unknown; picks?: unknown }
   try {

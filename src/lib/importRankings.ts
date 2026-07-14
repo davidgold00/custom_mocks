@@ -61,7 +61,7 @@ export function parseRankingsSheet(
       ? XLSX.read(data, { type: 'string' })
       : XLSX.read(data, { type: 'array' })
   } catch {
-    throw new Error('Could not read that file — it doesn’t look like a valid spreadsheet or CSV.')
+    throw new Error('Could not read that file. It doesn’t look like a valid spreadsheet or CSV.')
   }
   const sheet = wb.Sheets[wb.SheetNames[0]]
   if (!sheet) throw new Error('The file has no sheets.')
@@ -115,7 +115,7 @@ export function parseRankingsSheet(
       const cands = byName.get(key) ?? []
       if (cands.length === 1) match = cands[0]
       else if (cands.length > 1) {
-        unmatched.push({ row: rowNum, name: rawName, reason: `Ambiguous — multiple ${cands.map(c => c.pos).join('/')} players share this name. Add a Position column.` })
+        unmatched.push({ row: rowNum, name: rawName, reason: `Ambiguous: multiple ${cands.map(c => c.pos).join('/')} players share this name. Add a Position column.` })
         return
       }
     }
@@ -133,7 +133,7 @@ export function parseRankingsSheet(
   })
 
   if (entries.length === 0) {
-    throw new Error('No rows matched any 2026 players — is this a fantasy football rankings sheet?')
+    throw new Error('No rows matched any 2026 players. Is this a fantasy football rankings sheet?')
   }
   entries.sort((a, b) => a.rank - b.rank || a.row - b.row)
 

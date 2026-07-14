@@ -51,7 +51,7 @@ function teamCounts(state: DraftState, teamIndex: number): Record<Position, numb
 
 const FLEX_ELIGIBLE = new Set<Position>(['RB', 'WR', 'TE'])
 
-/** Unfilled starting slots (incl. FLEX) — used to force-fill late in drafts */
+/** Unfilled starting slots (incl. FLEX), used to force-fill late in drafts */
 function unfilledStarters(
   settings: LeagueSettings,
   counts: Record<Position, number>
@@ -88,7 +88,7 @@ function isAllowedThisRound(profile: BotProfile, round: number, p: RankedPlayer)
 /**
  * How far below the best available player a bot may realistically reach,
  * in board spots. Grows slowly with the round; scaled by the randomness
- * slider (0–100). Round 1 is nearly locked — only randomness 100 can
+ * slider (0–100). Round 1 is nearly locked, only randomness 100 can
  * produce a pick from outside the projected first round.
  */
 export function reachWindow(round: number, randomness: number): number {
@@ -100,7 +100,7 @@ export function reachWindow(round: number, randomness: number): number {
 }
 
 /**
- * Scores a candidate for a bot (deterministic — no noise here; variance comes
+ * Scores a candidate for a bot (deterministic, no noise here; variance comes
  * from the bounded sampling in pickForBot). Units are roughly "spots on the
  * user's board": a +10 term makes the bot treat the player as ranked 10 spots higher.
  */
@@ -168,7 +168,7 @@ export function pickForBot(opts: {
   let candidates: RankedPlayer[]
   let forceFill = false
   if (starters.total >= roundsLeft) {
-    // must fill starting lineup — restrict to needed positions, ignore gates
+    // must fill starting lineup, restrict to needed positions, ignore gates
     forceFill = true
     candidates = pool.filter(
       (p) => starters.needs.has(p.pos) || (starters.flexOpen && FLEX_ELIGIBLE.has(p.pos))
@@ -180,7 +180,7 @@ export function pickForBot(opts: {
   }
 
   // hard realism cap: only players within reach of the best available are
-  // draftable at all (force-fill picks are exempt — grabbing your K late
+  // draftable at all (force-fill picks are exempt: grabbing your K late
   // isn't a "reach", it's filling the lineup)
   const randomness = profile.randomness ?? 10
   if (!forceFill) {

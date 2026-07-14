@@ -26,6 +26,6 @@ export const PRESET_DESCRIPTIONS: Record<Preset, string> = {
   RBHeavy: 'Hammers running backs in the early rounds',
   ZeroRB: 'Fades RBs early, loads up on WRs',
   ZeroWR: 'Fades WRs early, loads up on RBs',
-  Chaotic: 'Unpredictable — reaches, sniping, chaos',
+  Chaotic: 'Unpredictable: reaches, sniping, chaos',
   AutoBPA: 'Strict best-player-available off the board',
 }

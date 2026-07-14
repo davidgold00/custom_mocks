@@ -11,7 +11,7 @@ export default function Dashboard() {
   const sources = useSources()
   const sourceLabel = rankings.baseSourceId.startsWith(USER_SOURCE_PREFIX)
     ? library.rankings.find((r) => USER_SOURCE_PREFIX + r.id === rankings.baseSourceId)?.name ?? 'Your import'
-    : sources.find((s) => s.id === rankings.baseSourceId)?.label ?? '—'
+    : sources.find((s) => s.id === rankings.baseSourceId)?.label ?? '-'
   const edited = rankings.customOrder !== null
   const SEASON = dataset.season
   const DATA_UPDATED = new Date(dataset.fetchedAt)
@@ -23,7 +23,7 @@ export default function Dashboard() {
       title: '1 · Set your rankings',
       desc: edited
         ? `Custom board based on ${sourceLabel}`
-        : `Following ${sourceLabel} — customize it to match your cheat sheet`,
+        : `Following ${sourceLabel}, customize it to match your cheat sheet`,
       cta: 'Open Rankings',
     },
     {
@@ -37,7 +37,7 @@ export default function Dashboard() {
       to: '/bots',
       icon: <SlidersHorizontal className="w-5 h-5" />,
       title: '3 · Shape your opponents',
-      desc: 'Give every seat a personality — early-QB, Zero-RB, chaotic reachers',
+      desc: 'Give every seat a personality: early-QB, Zero-RB, chaotic reachers',
       cta: 'Configure Bots',
     },
     {
@@ -64,7 +64,7 @@ export default function Dashboard() {
           </h2>
           <p className="mt-3 text-indigo-100 text-sm md:text-base">
             Start from live {SEASON} ADP or expert ranks, reshape the board to match your own
-            cheat sheet, and mock against opponents who reach, snipe, and panic — so draft
+            cheat sheet, and mock against opponents who reach, snipe, and panic, so draft
             night never surprises you.
           </p>
           <div className="mt-6 flex gap-3">

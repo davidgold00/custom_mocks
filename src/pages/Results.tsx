@@ -120,7 +120,7 @@ export default function Results() {
       ) : (
         <Card>
           <CardBody className="py-12 text-center text-slate-500">
-            No draft results yet — run a mock from the Draft Room first.
+            No draft results yet. Run a mock from the Draft Room first.
           </CardBody>
         </Card>
       )}

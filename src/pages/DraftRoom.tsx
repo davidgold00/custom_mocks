@@ -236,7 +236,7 @@ export default function DraftRoom() {
     // Stop the loop if it's the user's seat
     if (humanIndex === currentTeam) return
 
-    // bot pick — off the user's board, seeded per pick so drafts are replayable
+    // bot pick, off the user's board, seeded per pick so drafts are replayable
     const profile = effectiveProfile(currentSeat)
     const rng = mulberry32(((state.seed ?? 1) ^ Math.imul(overall, 0x9e3779b1)) >>> 0)
     const choice =
@@ -311,7 +311,7 @@ export default function DraftRoom() {
     <div className="grid grid-rows-[auto_minmax(120px,auto)_minmax(260px,1fr)] gap-4">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <div className="text-lg font-semibold">Draft Board — Round {round}</div>
+        <div className="text-lg font-semibold">Draft Board, Round {round}</div>
         <div className="flex items-center gap-2">
           {!started && !running && (
             <Button onClick={startDraft} variant="primary">Start</Button>
@@ -331,7 +331,7 @@ export default function DraftRoom() {
           )}
 
           {isHumanTurn && (
-            <span className="text-sm text-slate-600">Your Pick — <b>{timeLeft}s</b></span>
+            <span className="text-sm text-slate-600">Your Pick: <b>{timeLeft}s</b></span>
           )}
         </div>
       </div>
@@ -482,7 +482,7 @@ function Board({
               const playerId = pick?.playerId
               return (
                 <div key={`${cell.r}-${cell.c}`} className="border border-slate-200 h-12 rounded-md m-1 px-2 py-[2px] text-xs bg-white">
-                  {playerId ? <Picked playerId={playerId} /> : <span className="text-slate-400">—</span>}
+                  {playerId ? <Picked playerId={playerId} /> : <span className="text-slate-400">-</span>}
                 </div>
               )
             })}
@@ -537,8 +537,8 @@ function PlayersTable({
                 <span className="ml-2 text-xs text-slate-400">{p.team}</span>
               </td>
               <td className="px-3 py-2"><PosBadge pos={p.pos} /></td>
-              <td className="px-3 py-2 text-slate-500">{p.bye ?? '—'}</td>
-              <td className="px-3 py-2 text-slate-500">{p.adp ?? '—'}</td>
+              <td className="px-3 py-2 text-slate-500">{p.bye ?? '-'}</td>
+              <td className="px-3 py-2 text-slate-500">{p.adp ?? '-'}</td>
               <td className="px-3 py-2 text-right">
                 <Button
                   variant="outline"
@@ -629,7 +629,7 @@ function RosterView({ state, teamIndex }: { state: any, teamIndex: number }) {
               </span>
             </>
           ) : (
-            <span className="text-xs text-slate-400">—</span>
+            <span className="text-xs text-slate-400">-</span>
           )}
         </div>
       ))}

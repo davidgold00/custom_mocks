@@ -27,7 +27,7 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
   try {
     res = await fetch(norm.url, { headers: { 'User-Agent': 'BoardRoom/1.0' }, redirect: 'follow' })
   } catch {
-    return json({ ok: false, error: 'That link could not be reached — check it works in your browser.' })
+    return json({ ok: false, error: 'That link could not be reached. Check it works in your browser.' })
   }
   if (!res.ok) {
     return json({
@@ -49,7 +49,7 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
     })
   }
   if (kind === 'unknown') {
-    return json({ ok: false, error: 'Unsupported file type — only CSV, TSV, or Excel (.xlsx/.xls) links work.' })
+    return json({ ok: false, error: 'Unsupported file type. Only CSV, TSV, or Excel (.xlsx/.xls) links work.' })
   }
 
   const name = norm.url.split('/').pop()?.split('?')[0] || 'imported-rankings'

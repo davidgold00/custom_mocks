@@ -35,14 +35,14 @@ async function authReq(path: string, body: object): Promise<{ user?: AuthUser; e
       body: JSON.stringify(body),
     })
   } catch {
-    return { error: 'No connection — check your network.' }
+    return { error: 'No connection. Check your network.' }
   }
   try {
     return (await res.json()) as { user?: AuthUser; error?: string }
   } catch {
     // non-JSON response = the account API isn't there (e.g. UI-only dev server)
     return {
-      error: `The account service didn’t answer (HTTP ${res.status}). If you're running locally, start the app with \`npm run dev\` — it launches the API and database automatically.`,
+      error: `The account service didn’t answer (HTTP ${res.status}). If you're running locally, start the app with \`npm run dev\`, which launches the API and database automatically.`,
     }
   }
 }
@@ -109,7 +109,7 @@ export const useAuth = create<AuthState>((set) => ({
   init: async () => {
     if (AUTH_BYPASS) {
       set({ status: 'authed', user: BYPASS_USER })
-      return // no server hydration/sync — local persistence only
+      return // no server hydration/sync, local persistence only
     }
     try {
       const res = await fetch('/api/auth/me')

@@ -1,6 +1,6 @@
 /**
  * Shared data layer: fetches + merges all public ranking sources into one dataset.
- * Pure ESM using only global fetch — runs in Node (scripts, vite dev middleware)
+ * Pure ESM using only global fetch, runs in Node (scripts, vite dev middleware)
  * and Cloudflare Workers (Pages Functions) unchanged.
  *
  * Dataset shape:

@@ -28,12 +28,12 @@ export default function About() {
           QB, whether they hammer running backs or fade them completely, how much they care
           about filling their roster versus grabbing whoever's best, and how much risk they
           can stomach. There's an unpredictability dial for how far off-script they'll go,
-          and you can even name specific players a bot loves — it'll grab them a round early,
+          and you can even name specific players a bot loves, and it'll grab them a round early,
           same as your buddy who takes his hometown quarterback every single year.
         </p>
         <p className="mt-2">
           The unpredictability is kept honest. Bots reach and snipe, but within limits a
-          real person would recognize — nobody's taking a fringe starter first overall.
+          real person would recognize: nobody's taking a fringe starter first overall.
           Early picks stay close to the board and things loosen up as the draft goes on,
           which is how actual drafts behave.
         </p>
@@ -51,7 +51,7 @@ export default function About() {
           trade values, covering PPR, half PPR, standard, superflex, and dynasty. The app
           refreshes itself daily when opened, there's a refresh button if news just broke,
           and every source shows the date its numbers are from. Summer rankings shift every
-          week — a sim running on July data in late August would be lying to you.
+          week, and a sim running on July data in late August would be lying to you.
         </p>
       </Section>
 
@@ -60,7 +60,7 @@ export default function About() {
           Pick any source as a starting point, then drag players around (or click a rank and
           type a new one) until it matches what you actually believe. The bots draft off
           your board, not some hidden internal list. So when your sleeper goes two rounds
-          early, that's not a glitch — that's the scenario you're here to rehearse.
+          early, that's not a glitch. That's the scenario you're here to rehearse.
         </p>
       </Section>
 
@@ -78,8 +78,8 @@ export default function About() {
           Claim whichever seat you draft from, set the clock, and go. You can watch any
           team's starting lineup fill in as picks come off the board, pause whenever, and
           every finished draft saves to your account so you can look back at how each plan
-          held up. No two runs play out the same, but every one of them stays plausible —
-          that's the whole trick.
+          held up. No two runs play out the same, but every one of them stays plausible.
+          That's the whole trick.
         </p>
       </Section>
 

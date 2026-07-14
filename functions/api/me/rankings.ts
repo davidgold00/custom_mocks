@@ -3,7 +3,7 @@ import { json, now, randomId, requireUser } from '../../_lib/auth'
 const MAX_BYTES = 256 * 1024
 const MAX_ROWS = 50
 
-/** POST /api/me/rankings — save an imported ranking list */
+/** POST /api/me/rankings: save an imported ranking list */
 export const onRequestPost = requireUser(async ({ request, env }, user) => {
   let body: { name?: string; note?: string; order?: unknown; id?: string }
   try {

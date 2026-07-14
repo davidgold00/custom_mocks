@@ -10,7 +10,7 @@ export function normalizeImportUrl(raw) {
   try {
     u = new URL(s)
   } catch {
-    return { error: 'That isn’t a valid URL — it should start with https://' }
+    return { error: 'That isn’t a valid URL. It should start with https://' }
   }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') {
     return { error: 'Only http(s) links are supported.' }

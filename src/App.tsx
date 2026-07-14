@@ -13,7 +13,7 @@ export default function App() {
 
   useEffect(() => { void init() }, [init])
 
-  // rankings move daily with news — quietly pull the latest on open if stale
+  // rankings move daily with news, so quietly pull the latest on open if stale
   useEffect(() => { autoRefresh() }, [autoRefresh])
 
   if (status === 'loading') {

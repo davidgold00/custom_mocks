@@ -33,7 +33,7 @@ export function ImportRankingsModal({ onClose }: { onClose: () => void }) {
 
   async function onFile(f: File) {
     if (!/\.(xlsx|xls|csv|tsv)$/i.test(f.name)) {
-      setError('Unsupported file type — upload an Excel (.xlsx/.xls) or CSV file.')
+      setError('Unsupported file type. Upload an Excel (.xlsx/.xls) or CSV file.')
       return
     }
     handleParse(await f.arrayBuffer(), f.name)
@@ -58,7 +58,7 @@ export function ImportRankingsModal({ onClose }: { onClose: () => void }) {
       }
       handleParse(data.kind === 'csv' ? (data.text ?? '') : base64ToArrayBuffer(data.base64 ?? ''), data.name)
     } catch {
-      setError('Could not reach the import service — are you offline?')
+      setError('Could not reach the import service. Are you offline?')
     } finally {
       setBusy(false)
     }
@@ -151,7 +151,7 @@ export function ImportRankingsModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <ul className="text-xs text-amber-800 space-y-1 max-h-32 overflow-auto">
                   {report.unmatched.slice(0, 20).map((u) => (
-                    <li key={u.row}>Row {u.row}: <b>{u.name}</b> — {u.reason}</li>
+                    <li key={u.row}>Row {u.row}: <b>{u.name}</b>, {u.reason}</li>
                   ))}
                   {report.unmatched.length > 20 && <li>…and {report.unmatched.length - 20} more</li>}
                 </ul>

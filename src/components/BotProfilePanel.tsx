@@ -88,7 +88,7 @@ const clamp = (v:number, lo:number, hi:number)=>Math.max(lo, Math.min(hi, v))
 const asNum = (v:any)=>Number.isFinite(+v) ? +v : 0
 
 type Props = {
-  /** Whatever your store has for this bot — can be partial. */
+  /** Whatever your store has for this bot, can be partial. */
   initial: any
   onSave: (next: any) => void
   onDiscard: () => void

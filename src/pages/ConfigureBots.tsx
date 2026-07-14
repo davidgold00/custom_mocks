@@ -422,7 +422,7 @@ export default function ConfigureBots() {
 }
 
 /**
- * Favorites text box. The parsed array can't be the input's value directly —
+ * Favorites text box. The parsed array can't be the input's value directly,
  * `split → trim → join` erases the comma/space you just typed. Keep raw text
  * locally while typing and commit the parsed list on change.
  */

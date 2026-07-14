@@ -3,7 +3,7 @@ import { json, now, randomId, requireUser } from '../../_lib/auth'
 const MAX_BYTES = 256 * 1024
 const MAX_ROWS = 50
 
-/** POST /api/me/bot-configs — save a bot setup */
+/** POST /api/me/bot-configs: save a bot setup */
 export const onRequestPost = requireUser(async ({ request, env }, user) => {
   let body: { id?: string; name?: string; teams?: number; bots?: unknown; globalBot?: unknown }
   try {

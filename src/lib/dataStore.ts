@@ -55,7 +55,7 @@ export const useData = create<DataState>((set, get) => ({
       if (!res.ok || data.error || !data.sources?.length) {
         throw new Error(data.error ?? `HTTP ${res.status}`)
       }
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)) } catch { /* quota — skip cache */ }
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)) } catch { /* quota exceeded, skip cache */ }
       set({ dataset: data, refreshing: false })
     } catch (e) {
       set({

@@ -193,7 +193,7 @@ export default function SetupLeague() {
       <Card>
         <CardHeader title="Tips" />
         <CardBody className="space-y-2 text-sm text-slate-600">
-          <p>Claim your draft spot in the Draft Room — you don’t need to set it here.</p>
+          <p>Claim your draft spot in the Draft Room. You don’t need to set it here.</p>
           <p>Rounds are automatically calculated from roster totals (including Bench and Superflex).</p>
           <p>If you enable Superflex, adjust other positions accordingly to keep rounds reasonable.</p>
         </CardBody>

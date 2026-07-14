@@ -129,7 +129,7 @@ export default function Rankings() {
 
       {refreshError && (
         <div className="rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-3 py-2">
-          Refresh failed: {refreshError} — showing the last good data instead.
+          Refresh failed: {refreshError}. Showing the last good data instead.
         </div>
       )}
 
@@ -290,7 +290,7 @@ export default function Rankings() {
         <CardBody className="p-0">
           {filtering && (
             <div className="px-4 py-2 text-xs text-slate-500 bg-slate-50 border-b border-slate-100">
-              Drag-to-reorder is disabled while filtering — use the arrows or edit the rank number.
+              Drag-to-reorder is disabled while filtering. Use the arrows or edit the rank number.
             </div>
           )}
           <div className="overflow-auto max-h-[62vh]">
@@ -377,8 +377,8 @@ function Row({
         <span className="ml-2 text-xs text-slate-400">{p.team}</span>
       </td>
       <td className="px-3 py-1.5"><PosBadge pos={p.pos} /></td>
-      <td className="px-3 py-1.5 text-slate-500">{p.bye ?? '—'}</td>
-      <td className="px-3 py-1.5 text-slate-500">{p.adp ?? '—'}</td>
+      <td className="px-3 py-1.5 text-slate-500">{p.bye ?? '-'}</td>
+      <td className="px-3 py-1.5 text-slate-500">{p.adp ?? '-'}</td>
       <td className="px-3 py-1.5">
         {delta !== 0 && (
           <span className={`text-xs font-semibold ${delta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -400,7 +400,7 @@ function Row({
   )
 }
 
-/** Click the rank to type a new one — fastest way to make big moves */
+/** Click the rank to type a new one, fastest way to make big moves */
 function RankInput({ rank, onCommit }: { rank: number; onCommit: (r: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(String(rank))

@@ -56,7 +56,7 @@ export async function createSession(db: D1Database, userId: string) {
   return { token, expires }
 }
 
-/** `Secure` only over https — Safari drops Secure cookies on http://localhost */
+/** `Secure` only over https, since Safari drops Secure cookies on http://localhost */
 const isHttps = (request: Request) => new URL(request.url).protocol === 'https:'
 
 export function sessionCookie(request: Request, token: string, expires: string) {
@@ -111,7 +111,7 @@ export const unauthorized = () => json({ error: 'Not signed in.' }, 401)
 export function dbErrorResponse(e: unknown): Response {
   const msg = e instanceof Error ? e.message : String(e)
   if (/no such table/i.test(msg)) {
-    return json({ error: 'Local database not initialized — run `npm run db:migrate` and restart.' }, 500)
+    return json({ error: 'Local database not initialized. Run `npm run db:migrate` and restart.' }, 500)
   }
   return json({ error: `Database error: ${msg}` }, 500)
 }

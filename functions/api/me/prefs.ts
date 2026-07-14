@@ -2,7 +2,7 @@ import { json, now, requireUser } from '../../_lib/auth'
 
 const MAX_BYTES = 64 * 1024
 
-/** PUT /api/me/prefs — upsert the user's app preferences blob */
+/** PUT /api/me/prefs: upsert the user's app preferences blob */
 export const onRequestPut = requireUser(async ({ request, env }, user) => {
   const body = await request.text()
   if (body.length > MAX_BYTES) return json({ error: 'Prefs too large.' }, 413)

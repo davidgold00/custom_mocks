@@ -1,4 +1,4 @@
-# wrangler.toml — Cloudflare Pages (Functions) dev config
+# wrangler.toml: Cloudflare Pages (Functions) dev config
 name = "mock-drafter-ui"
 compatibility_date = "2024-11-01"
 
