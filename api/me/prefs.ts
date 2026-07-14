@@ -4,7 +4,7 @@ import { json, now, requireUser } from '../_lib/auth'
 const MAX_BYTES = 64 * 1024
 
 /** PUT /api/me/prefs: upsert the user's app preferences blob */
-export default requireUser(async (request, user) => {
+const handler = requireUser(async (request, user) => {
   if (request.method !== 'PUT') return json({ error: 'Method not allowed.' }, 405)
 
   const body = await request.text()
@@ -21,3 +21,5 @@ export default requireUser(async (request, user) => {
   `
   return json({ ok: true })
 })
+
+export default { fetch: handler }

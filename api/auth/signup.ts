@@ -4,7 +4,7 @@ import {
   json, randomId, now, hashPassword, createSession, sessionCookie, validateCredentials, dbErrorResponse,
 } from '../_lib/auth'
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
   if (await isRateLimited(request, 'signup', 5, 60 * 60)) {
     return json({ error: 'Too many signup attempts. Please try again later.' }, 429)
@@ -42,3 +42,5 @@ export default async function handler(request: Request): Promise<Response> {
     return dbErrorResponse(e)
   }
 }
+
+export default { fetch: handler }

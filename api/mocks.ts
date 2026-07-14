@@ -7,7 +7,7 @@ import { redis } from './_lib/redis'
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method === 'GET') {
     const id = new URL(request.url).searchParams.get('id')
     if (!id) return json({ error: 'missing id' }, 400)
@@ -32,3 +32,5 @@ export default async function handler(request: Request): Promise<Response> {
 
   return json({ error: 'Method not allowed.' }, 405)
 }
+
+export default { fetch: handler }

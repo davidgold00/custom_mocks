@@ -1,6 +1,6 @@
 import { json, getUser, unauthorized, dbErrorResponse } from '../_lib/auth'
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405)
   try {
     const user = await getUser(request)
@@ -9,3 +9,5 @@ export default async function handler(request: Request): Promise<Response> {
     return dbErrorResponse(e)
   }
 }
+
+export default { fetch: handler }

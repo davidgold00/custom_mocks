@@ -2,7 +2,7 @@ import { sql } from '../_lib/db'
 import { json, requireUser } from '../_lib/auth'
 
 /** GET /api/me/library: everything the client needs to hydrate after login */
-export default requireUser(async (request, user) => {
+const handler = requireUser(async (request, user) => {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405)
 
   const [prefs, botConfigs, rankings, drafts] = await Promise.all([
@@ -23,3 +23,5 @@ export default requireUser(async (request, user) => {
     drafts: drafts.rows.map((r: any) => ({ id: r.id, name: r.name, createdAt: r.created_at })),
   })
 })
+
+export default { fetch: handler }

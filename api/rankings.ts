@@ -19,7 +19,7 @@ const json = (data: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   })
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405)
 
   const force = new URL(request.url).searchParams.get('force') === '1'
@@ -44,3 +44,5 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: `Could not fetch live data: ${e instanceof Error ? e.message : e}` }, 502)
   }
 }
+
+export default { fetch: handler }

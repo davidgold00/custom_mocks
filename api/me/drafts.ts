@@ -4,7 +4,7 @@ import { json, now, randomId, requireUser } from '../_lib/auth'
 const MAX_BYTES = 512 * 1024
 const MAX_ROWS = 200
 
-export default requireUser(async (request, user) => {
+const handler = requireUser(async (request, user) => {
   if (request.method === 'GET') {
     const id = new URL(request.url).searchParams.get('id')
     if (!id) return json({ error: 'Missing id.' }, 400)
@@ -63,3 +63,5 @@ export default requireUser(async (request, user) => {
 
   return json({ error: 'Method not allowed.' }, 405)
 })
+
+export default { fetch: handler }

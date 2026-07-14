@@ -55,7 +55,7 @@ async function readLimited(res: Response): Promise<ArrayBuffer> {
   return bytes.buffer
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
 
   let url: string
@@ -114,3 +114,5 @@ export default async function handler(request: Request): Promise<Response> {
   }
   return json({ ok: true, kind, name, base64: btoa(bin) })
 }
+
+export default { fetch: handler }

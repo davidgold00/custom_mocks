@@ -4,7 +4,7 @@ import { json, now, randomId, requireUser } from '../_lib/auth'
 const MAX_BYTES = 256 * 1024
 const MAX_ROWS = 50
 
-export default requireUser(async (request, user) => {
+const handler = requireUser(async (request, user) => {
   if (request.method === 'POST') {
     let body: { id?: string; name?: string; teams?: number; bots?: unknown; globalBot?: unknown }
     try {
@@ -40,3 +40,5 @@ export default requireUser(async (request, user) => {
 
   return json({ error: 'Method not allowed.' }, 405)
 })
+
+export default { fetch: handler }
