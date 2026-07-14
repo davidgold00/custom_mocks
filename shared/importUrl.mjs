@@ -1,6 +1,28 @@
 /** Shared URL-import helpers: validation, Google Sheets rewriting, content sniffing. */
 
-export const MAX_BYTES = 8 * 1024 * 1024
+// Vercel Function responses are capped at 4.5 MB. XLSX bytes are base64
+// encoded in JSON, so 3 MB keeps the encoded response safely under that cap.
+export const MAX_BYTES = 3 * 1024 * 1024
+
+function isPrivateHostname(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+    return true
+  }
+  // URL normalizes unusual IPv4 spellings (integer, octal, hex) before this.
+  const parts = host.split('.').map(Number)
+  if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+    const [a, b] = parts
+    return a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+  }
+  // Literal IPv6 URLs are unnecessary for this feature and are difficult to
+  // validate safely without DNS/network access in every supported runtime.
+  return host.includes(':')
+}
 
 /** Validate + normalize a user-pasted rankings link. Returns {url} or {error}. */
 export function normalizeImportUrl(raw) {
@@ -12,11 +34,14 @@ export function normalizeImportUrl(raw) {
   } catch {
     return { error: 'That isn’t a valid URL. It should start with https://' }
   }
-  if (u.protocol !== 'https:' && u.protocol !== 'http:') {
-    return { error: 'Only http(s) links are supported.' }
+  if (u.protocol !== 'https:') {
+    return { error: 'Only secure https:// links are supported.' }
+  }
+  if (u.username || u.password || isPrivateHostname(u.hostname)) {
+    return { error: 'That address is not a supported public link.' }
   }
   // Google Sheets share links → CSV export of the first sheet
-  const m = u.href.match(/docs\.google\.com\/spreadsheets\/d\/([\w-]+)/)
+  const m = u.hostname === 'docs.google.com' && u.pathname.match(/^\/spreadsheets\/d\/([\w-]+)/)
   if (m) {
     const gid = u.hash.match(/gid=(\d+)/)?.[1] ?? u.searchParams.get('gid') ?? '0'
     return { url: `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}` }

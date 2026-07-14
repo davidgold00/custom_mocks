@@ -18,14 +18,13 @@ board with realistic amounts of chaos.
 
 ## Running it
 
-First time only, one-time setup with Vercel (details in the deployment section
-below):
+First time only, link the local checkout to the Vercel project (details in the
+deployment section below):
 
 ```
-npm i -g vercel
-vercel login
-vercel link
-vercel env pull .env.local
+npx vercel login
+npx vercel link
+npx vercel env pull .env.local
 ```
 
 Then day to day:
@@ -37,7 +36,7 @@ npm run dev
 
 That's it, then open the local URL `vercel dev` prints (usually
 http://localhost:3000). The dev command runs the Vite app and every function
-under `api/` together on one port, using whatever Postgres/KV database is
+under `api/` together on one port, using whatever Neon/Upstash databases are
 connected to the linked Vercel project.
 
 Other commands you'll actually use:
@@ -45,7 +44,7 @@ Other commands you'll actually use:
 ```
 npm run dev:open       # skip the login screen while debugging (see below)
 npm run update-data    # re-snapshot the bundled player data from live sources
-npm run db:migrate     # apply DB migrations to whatever POSTGRES_URL points at
+npm run db:migrate     # apply DB migrations to whatever DATABASE_URL points at
 npm run build          # typecheck + production build
 ```
 
@@ -132,34 +131,41 @@ page), bot setups, imported rankings, and your working preferences. First
 sign-in migrates whatever was on the device up to the account; after that the
 server wins.
 
-Before opening signups to strangers, put a rate limit on the login endpoint
-(Vercel's firewall rules, or a small check against a KV counter, both work).
+Login (12 attempts per 15 minutes per IP) and signup (5 per hour per IP) are
+rate-limited with hashed IP keys in Redis. You can add stricter Vercel Firewall
+rules later if traffic warrants them.
 
 ## Deploying to Vercel
 
 The app is one Vercel project: the React build serves as static files, and
-everything under `api/` runs as Edge Functions. Two pieces of storage plug into
-that project from the dashboard, no separate accounts needed.
+everything under `api/` runs as Node.js Vercel Functions. Two Marketplace
+storage integrations plug into that project from the dashboard.
 
 **One-time setup, in the Vercel dashboard:**
 
-1. Import this repo as a new Vercel project (New Project -> pick the repo). The
-   Vite framework preset is detected automatically; the build command and
-   output directory are already set in `vercel.json`.
-2. Open the project's **Storage** tab -> **Create Database** -> add a
-   **Postgres** database -> connect it to the project. This injects
-   `POSTGRES_URL` and friends into the project's environment automatically.
-3. Storage tab again -> add a **KV** (Redis) store -> connect it to the same
-   project. This injects `KV_REST_API_URL` / `KV_REST_API_TOKEN` the same way.
-   KV holds the cached player-rankings dataset and shareable draft-room links;
-   nothing sensitive lives in it.
+1. In Vercel, choose **Add New -> Project**, import the GitHub repository, and
+   deploy it with the Vite preset. The build command, output directory, SPA
+   routing, function durations, and security headers are already set in
+   `vercel.json`. Under **Settings -> Git**, set the Production Branch to
+   `boardroom1_prod` so future pushes to this branch deploy automatically.
+2. Open the project's **Storage** tab (or **Marketplace**) and add **Neon
+   Postgres**. Create a database and connect it to this project for Production,
+   Preview, and Development. This injects `DATABASE_URL`. If Vercel asks for a
+   region, US East (AWS) is a sensible default for this app.
+3. Add **Upstash Redis** from the Marketplace and connect it to the same three
+   environments. This injects `UPSTASH_REDIS_REST_URL` and
+   `UPSTASH_REDIS_REST_TOKEN`. Redis holds the cached player-rankings dataset
+   and shareable draft-room links; nothing sensitive lives in it.
 4. Run the schema once, either way is fine:
-   - **Dashboard**: open the Postgres database's Query tab and paste the
-     contents of `migrations/0001_init.sql`, then run it.
+   - **Dashboard**: open the Neon database's SQL Editor, paste the contents of
+     `migrations/0001_init.sql`, and run it.
    - **CLI**: from your machine, `vercel link` the project, then
      `vercel env pull .env.production.local --environment=production` and
      `node --env-file=.env.production.local scripts/migrate.mjs`.
-5. Push to the branch Vercel is watching (or click Deploy). Done.
+5. Redeploy after connecting both integrations. Open the deployment URL and
+   create an account; successful signup confirms the functions, cookie, and
+   database schema are all working. Open Rankings and use **Refresh data** to
+   confirm Redis and the live-source function are working.
 
 **What I actually need from you** to help with any of this: not much, and
 nothing secret. I don't need your Vercel password, an API token, or a database
@@ -169,12 +175,12 @@ What's useful to know is:
 
 - The project name/slug once it exists, so I can double check anything
   project-specific.
-- Confirmation that Postgres and KV storage are both added and connected (step
+- Confirmation that Neon and Upstash storage are both added and connected (step
   2/3 above) before we debug anything data-related, since most "it's broken"
   reports at this stage are just a missing storage connection.
-- Whether you want to run the CLI steps yourself (`vercel login` is an
+- Whether you want to run the CLI steps yourself (`npx vercel login` is an
   interactive browser flow I can't do on your behalf) or handle migrations
-  through the dashboard Query tab instead.
+  through the Neon SQL Editor instead.
 
 ## Layout
 
@@ -182,18 +188,19 @@ What's useful to know is:
 src/            React app (vite + TS + Tailwind + zustand)
   lib/          draft engine, rankings/board logic, auth + data stores
   pages/        Dashboard, Rankings, Draft Room, Results, Bots, About, Auth
-api/            Vercel Edge Functions (the API)
+api/            Node.js Vercel Functions (the API)
   auth/         signup, login, logout, me
   me/           library, prefs, bot-configs, rankings, drafts
-  rankings.ts   live dataset, KV-cached
+  rankings.ts   live dataset, Redis-cached
   import-url.ts server-side fetch for pasted rankings links
-  mocks.ts      shareable draft-room snapshots (KV)
+  mocks.ts      shareable draft-room snapshots (Redis)
 shared/         data-source adapters, used by the API, the dev server,
-                and the snapshot script, so there's one implementation
+  and the snapshot script, so there's one implementation
 scripts/        update-data.mjs (dataset snapshot), migrate.mjs (DB schema)
 migrations/     Postgres schema
 ```
 
 The one structural rule worth knowing: the data-fetching code is written once
-in `shared/` as plain ESM and runs unchanged in Node and on Vercel's Edge
-runtime. When the rankings logic changes, dev and production can't drift apart.
+in `shared/` as plain ESM and runs unchanged in the snapshot script and Vercel
+Functions. When the rankings logic changes, dev and production can't drift
+apart.

@@ -1,7 +1,5 @@
-import { sql } from '@vercel/postgres'
+import { sql } from '../_lib/db'
 import { json, now, requireUser } from '../_lib/auth'
-
-export const config = { runtime: 'edge' }
 
 const MAX_BYTES = 64 * 1024
 

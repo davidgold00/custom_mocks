@@ -1,7 +1,5 @@
-import { sql } from '@vercel/postgres'
+import { sql } from '../_lib/db'
 import { json, requireUser } from '../_lib/auth'
-
-export const config = { runtime: 'edge' }
 
 /** GET /api/me/library: everything the client needs to hydrate after login */
 export default requireUser(async (request, user) => {

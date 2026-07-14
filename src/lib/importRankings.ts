@@ -1,5 +1,4 @@
-import * as XLSX from 'xlsx'
-import type { Player, Position } from '@/types'
+import type { Player } from '@/types'
 
 export interface ImportReport {
   order: string[]
@@ -51,11 +50,14 @@ function findColumn(headers: string[], wanted: string[]): number {
  * Parse an uploaded/linked rankings sheet and match rows to the canonical
  * player pool. Throws Error with a human-readable message when unusable.
  */
-export function parseRankingsSheet(
+export async function parseRankingsSheet(
   data: ArrayBuffer | string,
   players: Record<string, Player>,
-): ImportReport {
-  let wb: XLSX.WorkBook
+): Promise<ImportReport> {
+  // Spreadsheet parsing is only needed when the import modal is used. Keeping
+  // it dynamic removes the large parser from the initial application bundle.
+  const XLSX = await import('xlsx')
+  let wb: import('xlsx').WorkBook
   try {
     wb = typeof data === 'string'
       ? XLSX.read(data, { type: 'string' })

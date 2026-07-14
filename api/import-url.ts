@@ -7,10 +7,53 @@
  */
 import { normalizeImportUrl, classifyContent, MAX_BYTES } from '../shared/importUrl.mjs'
 
-export const config = { runtime: 'edge' }
-
 const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  })
+
+async function fetchPublicUrl(initialUrl: string): Promise<Response> {
+  let url = initialUrl
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    const res = await fetch(url, { headers: { 'User-Agent': 'BoardRoom/1.0' }, redirect: 'manual' })
+    if (![301, 302, 303, 307, 308].includes(res.status)) return res
+    const location = res.headers.get('location')
+    if (!location) return res
+    const next = normalizeImportUrl(new URL(location, url).href)
+    if ('error' in next) throw new Error(next.error)
+    url = next.url
+  }
+  throw new Error('That link redirects too many times.')
+}
+
+async function readLimited(res: Response): Promise<ArrayBuffer> {
+  const declared = Number(res.headers.get('content-length') ?? 0)
+  if (declared > MAX_BYTES) throw new Error('File is too large (over 3 MB).')
+  if (!res.body) return new ArrayBuffer(0)
+
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > MAX_BYTES) {
+      await reader.cancel()
+      throw new Error('File is too large (over 3 MB).')
+    }
+    chunks.push(value)
+  }
+
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes.buffer
+}
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
@@ -27,9 +70,12 @@ export default async function handler(request: Request): Promise<Response> {
 
   let res: Response
   try {
-    res = await fetch(norm.url, { headers: { 'User-Agent': 'BoardRoom/1.0' }, redirect: 'follow' })
-  } catch {
-    return json({ ok: false, error: 'That link could not be reached. Check it works in your browser.' })
+    res = await fetchPublicUrl(norm.url)
+  } catch (e) {
+    return json({
+      ok: false,
+      error: e instanceof Error ? e.message : 'That link could not be reached. Check it works in your browser.',
+    })
   }
   if (!res.ok) {
     return json({
@@ -40,8 +86,12 @@ export default async function handler(request: Request): Promise<Response> {
     })
   }
 
-  const buf = await res.arrayBuffer()
-  if (buf.byteLength > MAX_BYTES) return json({ ok: false, error: 'File is too large (over 8 MB).' })
+  let buf: ArrayBuffer
+  try {
+    buf = await readLimited(res)
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : 'Could not read that file.' }, 413)
+  }
 
   const kind = classifyContent(res.headers.get('content-type') ?? '', norm.url, buf)
   if (kind === 'html') {

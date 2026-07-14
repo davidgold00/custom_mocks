@@ -20,9 +20,9 @@ export function ImportRankingsModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('My rankings')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  function handleParse(data: ArrayBuffer | string, suggestedName?: string) {
+  async function handleParse(data: ArrayBuffer | string, suggestedName?: string) {
     try {
-      setReport(parseRankingsSheet(data, players))
+      setReport(await parseRankingsSheet(data, players))
       if (suggestedName) setName(suggestedName.replace(/\.(xlsx|xls|csv|tsv)$/i, ''))
       setError(null)
     } catch (e) {
@@ -36,7 +36,7 @@ export function ImportRankingsModal({ onClose }: { onClose: () => void }) {
       setError('Unsupported file type. Upload an Excel (.xlsx/.xls) or CSV file.')
       return
     }
-    handleParse(await f.arrayBuffer(), f.name)
+    await handleParse(await f.arrayBuffer(), f.name)
   }
 
   async function onFetchUrl() {
@@ -56,7 +56,7 @@ export function ImportRankingsModal({ onClose }: { onClose: () => void }) {
         setError(data.error ?? 'Import failed.')
         return
       }
-      handleParse(data.kind === 'csv' ? (data.text ?? '') : base64ToArrayBuffer(data.base64 ?? ''), data.name)
+      await handleParse(data.kind === 'csv' ? (data.text ?? '') : base64ToArrayBuffer(data.base64 ?? ''), data.name)
     } catch {
       setError('Could not reach the import service. Are you offline?')
     } finally {

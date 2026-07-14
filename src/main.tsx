@@ -1,15 +1,16 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './styles.css'
 import App from './App'
-import Dashboard from './pages/Dashboard'
-import Rankings from './pages/Rankings'
-import SetupLeague from './pages/SetupLeague'
-import ConfigureBots from './pages/ConfigureBots'
-import DraftRoom from './pages/DraftRoom'
-import Results from './pages/Results'
-import About from './pages/About'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Rankings = lazy(() => import('./pages/Rankings'))
+const SetupLeague = lazy(() => import('./pages/SetupLeague'))
+const ConfigureBots = lazy(() => import('./pages/ConfigureBots'))
+const DraftRoom = lazy(() => import('./pages/DraftRoom'))
+const Results = lazy(() => import('./pages/Results'))
+const About = lazy(() => import('./pages/About'))
 
 const router = createBrowserRouter([
   {
@@ -29,6 +30,8 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Loading…</div>}>
+      <RouterProvider router={router} />
+    </Suspense>
   </React.StrictMode>,
 )

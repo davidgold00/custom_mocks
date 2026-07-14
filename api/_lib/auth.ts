@@ -1,10 +1,9 @@
-/** Shared auth utilities for Vercel Edge functions: PBKDF2 password hashing,
+/** Shared auth utilities for Vercel functions: PBKDF2 password hashing,
  *  DB-backed sessions in an httpOnly cookie, and request authentication.
- *  Storage: Vercel Postgres (via @vercel/postgres), read from POSTGRES_URL,
- *  which Vercel injects automatically once Postgres storage is connected
- *  to the project. */
+ *  Storage: Neon Postgres, read from DATABASE_URL, which the Vercel
+ *  Marketplace integration injects when the database is connected. */
 
-import { sql } from '@vercel/postgres'
+import { sql } from './db'
 
 export type User = { id: string; username: string; created_at: string }
 
@@ -113,8 +112,8 @@ export function dbErrorResponse(e: unknown): Response {
   if (/relation .* does not exist/i.test(msg)) {
     return json({ error: 'Database not initialized. Run `npm run db:migrate` (see README) and redeploy.' }, 500)
   }
-  if (/missing_connection_string|POSTGRES_URL/i.test(msg)) {
-    return json({ error: 'No database connected. Add Postgres storage to this project in the Vercel dashboard.' }, 500)
+  if (/missing_connection_string|DATABASE_URL|POSTGRES_URL/i.test(msg)) {
+    return json({ error: 'No database connected. Add Neon Postgres from the Vercel Marketplace and connect it to this project.' }, 500)
   }
   return json({ error: `Database error: ${msg}` }, 500)
 }

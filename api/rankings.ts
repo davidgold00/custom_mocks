@@ -1,16 +1,14 @@
 /**
- * GET /api/rankings         -> dataset (KV-cached, rebuilt when older than 6h)
+ * GET /api/rankings         -> dataset (Redis-cached, rebuilt when older than 6h)
  * GET /api/rankings?force=1 -> rebuild now (the UI "Refresh data" button)
  * Falls back to stale cache if the live rebuild fails.
  *
- * Cache: Vercel KV, read from KV_REST_API_URL/KV_REST_API_TOKEN, which Vercel
- * injects automatically once KV storage is connected to the project.
+ * Cache: Upstash Redis. The Vercel Marketplace integration injects
+ * UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN when it is connected.
  */
-import { kv } from '@vercel/kv'
+import { redis } from './_lib/redis'
 // @ts-ignore: plain ESM module shared with Node scripts
 import { buildDataset } from '../shared/sources.mjs'
-
-export const config = { runtime: 'edge' }
 
 const KEY = 'dataset:v2'
 const MAX_AGE_MS = 6 * 60 * 60 * 1000
@@ -25,7 +23,12 @@ export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405)
 
   const force = new URL(request.url).searchParams.get('force') === '1'
-  const cached = await kv.get<{ fetchedAt: string }>(KEY)
+  let cached: { fetchedAt: string } | null = null
+  try {
+    cached = await redis.get<{ fetchedAt: string }>(KEY)
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : 'Redis unavailable.' }, 503)
+  }
 
   if (cached && !force) {
     const age = Date.now() - new Date(cached.fetchedAt).getTime()
@@ -34,7 +37,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   try {
     const data = await buildDataset()
-    await kv.set(KEY, data)
+    await redis.set(KEY, data)
     return json(data)
   } catch (e) {
     if (cached) return json(cached) // stale beats nothing

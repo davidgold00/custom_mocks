@@ -1,12 +1,14 @@
-import { sql } from '@vercel/postgres'
+import { sql } from '../_lib/db'
+import { isRateLimited } from '../_lib/rateLimit'
 import {
   json, now, hashPassword, safeEqual, createSession, sessionCookie, dbErrorResponse,
 } from '../_lib/auth'
 
-export const config = { runtime: 'edge' }
-
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
+  if (await isRateLimited(request, 'login', 12, 15 * 60)) {
+    return json({ error: 'Too many login attempts. Please try again in a few minutes.' }, 429)
+  }
 
   let body: { username?: string; password?: string }
   try {
