@@ -18,24 +18,34 @@ board with realistic amounts of chaos.
 
 ## Running it
 
+First time only, one-time setup with Vercel (details in the deployment section
+below):
+
+```
+npm i -g vercel
+vercel login
+vercel link
+vercel env pull .env.local
+```
+
+Then day to day:
+
 ```
 npm i
 npm run dev
 ```
 
-That's it, then open http://localhost:5173. The dev command starts three things
-at once: the vite dev server, the API (Cloudflare Pages Functions running
-locally through wrangler), and a local SQLite database for accounts. Migrations
-get applied automatically on startup, so a fresh clone works without any setup
-ritual.
+That's it, then open the local URL `vercel dev` prints (usually
+http://localhost:3000). The dev command runs the Vite app and every function
+under `api/` together on one port, using whatever Postgres/KV database is
+connected to the linked Vercel project.
 
 Other commands you'll actually use:
 
 ```
 npm run dev:open       # skip the login screen while debugging (see below)
-npm run dev:full       # serve the production build + API on :8788
 npm run update-data    # re-snapshot the bundled player data from live sources
-npm run db:migrate     # apply DB migrations locally (dev does this for you)
+npm run db:migrate     # apply DB migrations to whatever POSTGRES_URL points at
 npm run build          # typecheck + production build
 ```
 
@@ -44,7 +54,9 @@ debugging gets old fast. It fakes a signed-in user, skips all account sync, and
 puts an amber "no auth" badge in the header so you can't forget which mode
 you're in. The bypass is compiled out of production builds entirely, since it
 hinges on `import.meta.env.DEV`, which is statically false there, so there's no
-way to ship it by accident.
+way to ship it by accident. Because it doesn't touch the API at all, plain
+`npm run dev:open` (just vite, no `vercel dev` needed) is also the fastest way
+to poke at the UI.
 
 ## Where the player data comes from
 
@@ -108,8 +120,8 @@ runs from a seed, so any weird result can be replayed exactly.
 
 ## Accounts
 
-Accounts are username + password only for now (email will come with deployment).
-Everything is stored in Cloudflare D1, schema in `migrations/0001_init.sql`.
+Accounts are username + password only for now (email will come later).
+Everything is stored in Postgres, schema in `migrations/0001_init.sql`.
 Passwords are hashed with PBKDF2-SHA256 at 150k iterations with per-user salts,
 and the iteration count is stored per user so the cost can be raised later
 without breaking old logins. Sessions last 30 days; the browser holds the token
@@ -120,15 +132,49 @@ page), bot setups, imported rankings, and your working preferences. First
 sign-in migrates whatever was on the device up to the account; after that the
 server wins.
 
-Deploying the database is two commands:
-
-```
-npx wrangler d1 create boardroom-db     # once, then paste the id into wrangler.toml
-npm run db:migrate:prod
-```
-
 Before opening signups to strangers, put a rate limit on the login endpoint
-(a Cloudflare WAF rule is the easy version).
+(Vercel's firewall rules, or a small check against a KV counter, both work).
+
+## Deploying to Vercel
+
+The app is one Vercel project: the React build serves as static files, and
+everything under `api/` runs as Edge Functions. Two pieces of storage plug into
+that project from the dashboard, no separate accounts needed.
+
+**One-time setup, in the Vercel dashboard:**
+
+1. Import this repo as a new Vercel project (New Project -> pick the repo). The
+   Vite framework preset is detected automatically; the build command and
+   output directory are already set in `vercel.json`.
+2. Open the project's **Storage** tab -> **Create Database** -> add a
+   **Postgres** database -> connect it to the project. This injects
+   `POSTGRES_URL` and friends into the project's environment automatically.
+3. Storage tab again -> add a **KV** (Redis) store -> connect it to the same
+   project. This injects `KV_REST_API_URL` / `KV_REST_API_TOKEN` the same way.
+   KV holds the cached player-rankings dataset and shareable draft-room links;
+   nothing sensitive lives in it.
+4. Run the schema once, either way is fine:
+   - **Dashboard**: open the Postgres database's Query tab and paste the
+     contents of `migrations/0001_init.sql`, then run it.
+   - **CLI**: from your machine, `vercel link` the project, then
+     `vercel env pull .env.production.local --environment=production` and
+     `node --env-file=.env.production.local scripts/migrate.mjs`.
+5. Push to the branch Vercel is watching (or click Deploy). Done.
+
+**What I actually need from you** to help with any of this: not much, and
+nothing secret. I don't need your Vercel password, an API token, or a database
+connection string pasted into chat, since the code reads everything from
+environment variables Vercel injects on its own once storage is connected.
+What's useful to know is:
+
+- The project name/slug once it exists, so I can double check anything
+  project-specific.
+- Confirmation that Postgres and KV storage are both added and connected (step
+  2/3 above) before we debug anything data-related, since most "it's broken"
+  reports at this stage are just a missing storage connection.
+- Whether you want to run the CLI steps yourself (`vercel login` is an
+  interactive browser flow I can't do on your behalf) or handle migrations
+  through the dashboard Query tab instead.
 
 ## Layout
 
@@ -136,15 +182,18 @@ Before opening signups to strangers, put a rate limit on the login endpoint
 src/            React app (vite + TS + Tailwind + zustand)
   lib/          draft engine, rankings/board logic, auth + data stores
   pages/        Dashboard, Rankings, Draft Room, Results, Bots, About, Auth
-functions/      Cloudflare Pages Functions (the API)
-  api/auth/     signup, login, logout, me
-  api/me/       library, prefs, bot-configs, rankings, drafts
+api/            Vercel Edge Functions (the API)
+  auth/         signup, login, logout, me
+  me/           library, prefs, bot-configs, rankings, drafts
+  rankings.ts   live dataset, KV-cached
+  import-url.ts server-side fetch for pasted rankings links
+  mocks.ts      shareable draft-room snapshots (KV)
 shared/         data-source adapters, used by the API, the dev server,
                 and the snapshot script, so there's one implementation
-scripts/        update-data.mjs (writes src/data/rankings-2026.json)
-migrations/     D1 schema
+scripts/        update-data.mjs (dataset snapshot), migrate.mjs (DB schema)
+migrations/     Postgres schema
 ```
 
 The one structural rule worth knowing: the data-fetching code is written once
-in `shared/` as plain ESM and runs unchanged in Node and in Workers. When the
-rankings logic changes, dev and production can't drift apart.
+in `shared/` as plain ESM and runs unchanged in Node and on Vercel's Edge
+runtime. When the rankings logic changes, dev and production can't drift apart.

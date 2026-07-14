@@ -4,18 +4,18 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm:dev:api\" \"vite --port 5173\"",
+    "dev": "vercel dev",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "update-data": "node scripts/update-data.mjs",
-    "dev:full": "npm run build && wrangler pages dev --port 8788",
-    "db:migrate": "wrangler d1 migrations apply boardroom-db --local",
-    "db:migrate:prod": "wrangler d1 migrations apply boardroom-db --remote",
-    "dev:api": "( [ -d dist ] || npm run build ) && wrangler d1 migrations apply boardroom-db --local && wrangler pages dev --port 8788",
+    "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "db:migrate:prod": "vercel env pull .env.production.local --environment=production && node --env-file=.env.production.local scripts/migrate.mjs",
     "dev:ui": "vite --port 5173",
     "dev:open": "VITE_BYPASS_AUTH=1 vite --port 5173"
   },
   "dependencies": {
+    "@vercel/kv": "^2.0.0",
+    "@vercel/postgres": "^0.10.0",
     "lucide-react": "^0.446.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -25,18 +25,16 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260712.1",
     "@types/node": "^24.3.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
-    "concurrently": "^10.0.3",
     "postcss": "^8.4.45",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4",
+    "vercel": "^37.14.0",
     "vite": "^5.4.2",
-    "vite-tsconfig-paths": "^5.1.4",
-    "wrangler": "^3.114.17"
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }

@@ -1,5 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
-
 /**
  * POST /api/import-url  { url }
  * Fetches a user-supplied rankings link server-side (browsers are blocked by CORS)
@@ -7,12 +5,16 @@
  *   { ok: true, kind: 'csv' | 'xlsx', name, text? , base64? }
  *   { ok: false, error: '<human-readable reason>' }
  */
-import { normalizeImportUrl, classifyContent, MAX_BYTES } from '../../shared/importUrl.mjs'
+import { normalizeImportUrl, classifyContent, MAX_BYTES } from '../shared/importUrl.mjs'
+
+export const config = { runtime: 'edge' }
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
-export const onRequestPost: PagesFunction = async ({ request }) => {
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
+
   let url: string
   try {
     url = String(((await request.json()) as { url?: string })?.url ?? '')
@@ -54,7 +56,7 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
 
   const name = norm.url.split('/').pop()?.split('?')[0] || 'imported-rankings'
   if (kind === 'csv') return json({ ok: true, kind, name, text: new TextDecoder().decode(buf) })
-  // xlsx: binary → base64
+  // xlsx: binary -> base64
   let bin = ''
   const bytes = new Uint8Array(buf)
   for (let i = 0; i < bytes.length; i += 0x8000) {

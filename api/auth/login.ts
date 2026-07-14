@@ -1,8 +1,13 @@
+import { sql } from '@vercel/postgres'
 import {
-  type Env, json, now, hashPassword, safeEqual, createSession, sessionCookie, dbErrorResponse,
-} from '../../_lib/auth'
+  json, now, hashPassword, safeEqual, createSession, sessionCookie, dbErrorResponse,
+} from '../_lib/auth'
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const config = { runtime: 'edge' }
+
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
+
   let body: { username?: string; password?: string }
   try {
     body = await request.json()
@@ -15,10 +20,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!username || !password) return fail()
 
   try {
-    const row = await env.DB
-      .prepare('SELECT id, username, pass_hash, pass_salt, pass_iters FROM users WHERE username = ?')
-      .bind(username)
-      .first<{ id: string; username: string; pass_hash: string; pass_salt: string; pass_iters: number }>()
+    const { rows } = await sql<{ id: string; username: string; pass_hash: string; pass_salt: string; pass_iters: number }>`
+      SELECT id, username, pass_hash, pass_salt, pass_iters FROM users WHERE lower(username) = lower(${username})
+    `
+    const row = rows[0]
     if (!row) {
       await hashPassword(password) // burn the same time whether or not the user exists
       return fail()
@@ -27,8 +32,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const { hash } = await hashPassword(password, row.pass_salt, row.pass_iters)
     if (!safeEqual(hash, row.pass_hash)) return fail()
 
-    await env.DB.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').bind(now(), row.id).run()
-    const { token, expires } = await createSession(env.DB, row.id)
+    await sql`UPDATE users SET last_login_at = ${now()} WHERE id = ${row.id}`
+    const { token, expires } = await createSession(row.id)
     return json({ user: { id: row.id, username: row.username } }, 200, { 'Set-Cookie': sessionCookie(request, token, expires) })
   } catch (e) {
     return dbErrorResponse(e)

@@ -1,9 +1,11 @@
-/// <reference types="@cloudflare/workers-types" />
+/** Shared auth utilities for Vercel Edge functions: PBKDF2 password hashing,
+ *  DB-backed sessions in an httpOnly cookie, and request authentication.
+ *  Storage: Vercel Postgres (via @vercel/postgres), read from POSTGRES_URL,
+ *  which Vercel injects automatically once Postgres storage is connected
+ *  to the project. */
 
-/** Shared auth utilities for Pages Functions: PBKDF2 password hashing,
- *  DB-backed sessions in an httpOnly cookie, and request authentication. */
+import { sql } from '@vercel/postgres'
 
-export type Env = { DB: D1Database; MOCKS_KV: KVNamespace }
 export type User = { id: string; username: string; created_at: string }
 
 const COOKIE = 'br_session'
@@ -46,13 +48,13 @@ export function safeEqual(a: string, b: string) {
 
 /* ---------------- sessions ---------------- */
 
-export async function createSession(db: D1Database, userId: string) {
+export async function createSession(userId: string) {
   const token = hex(crypto.getRandomValues(new Uint8Array(32)).buffer)
   const expires = new Date(Date.now() + SESSION_DAYS * 86400_000).toISOString()
-  await db
-    .prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256(token), userId, now(), expires)
-    .run()
+  await sql`
+    INSERT INTO sessions (token_hash, user_id, created_at, expires_at)
+    VALUES (${await sha256(token)}, ${userId}, ${now()}, ${expires})
+  `
   return { token, expires }
 }
 
@@ -72,29 +74,27 @@ function readCookie(request: Request): string | null {
 }
 
 /** Returns the authenticated user or null. Also prunes the expired session it hits. */
-export async function getUser(request: Request, db: D1Database): Promise<User | null> {
+export async function getUser(request: Request): Promise<User | null> {
   const token = readCookie(request)
   if (!token) return null
   const th = await sha256(token)
-  const row = await db
-    .prepare(
-      `SELECT u.id, u.username, u.created_at, s.expires_at
-       FROM sessions s JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ?`,
-    )
-    .bind(th)
-    .first<User & { expires_at: string }>()
+  const { rows } = await sql<User & { expires_at: string }>`
+    SELECT u.id, u.username, u.created_at, s.expires_at
+    FROM sessions s JOIN users u ON u.id = s.user_id
+    WHERE s.token_hash = ${th}
+  `
+  const row = rows[0]
   if (!row) return null
   if (row.expires_at < now()) {
-    await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(th).run()
+    await sql`DELETE FROM sessions WHERE token_hash = ${th}`
     return null
   }
   return { id: row.id, username: row.username, created_at: row.created_at }
 }
 
-export async function destroySession(request: Request, db: D1Database) {
+export async function destroySession(request: Request) {
   const token = readCookie(request)
-  if (token) await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(token)).run()
+  if (token) await sql`DELETE FROM sessions WHERE token_hash = ${await sha256(token)}`
 }
 
 /* ---------------- responses ---------------- */
@@ -107,24 +107,27 @@ export const json = (data: unknown, status = 200, headers: Record<string, string
 
 export const unauthorized = () => json({ error: 'Not signed in.' }, 401)
 
-/** Turn raw D1 failures into actionable JSON instead of an HTML error page. */
+/** Turn raw Postgres failures into actionable JSON instead of a stack trace. */
 export function dbErrorResponse(e: unknown): Response {
   const msg = e instanceof Error ? e.message : String(e)
-  if (/no such table/i.test(msg)) {
-    return json({ error: 'Local database not initialized. Run `npm run db:migrate` and restart.' }, 500)
+  if (/relation .* does not exist/i.test(msg)) {
+    return json({ error: 'Database not initialized. Run `npm run db:migrate` (see README) and redeploy.' }, 500)
+  }
+  if (/missing_connection_string|POSTGRES_URL/i.test(msg)) {
+    return json({ error: 'No database connected. Add Postgres storage to this project in the Vercel dashboard.' }, 500)
   }
   return json({ error: `Database error: ${msg}` }, 500)
 }
 
 /** wrapper for endpoints that require a signed-in user */
 export function requireUser(
-  handler: (ctx: EventContext<Env, string, Record<string, unknown>>, user: User) => Promise<Response>,
-): PagesFunction<Env> {
-  return async (ctx) => {
+  handler: (request: Request, user: User) => Promise<Response>,
+) {
+  return async (request: Request): Promise<Response> => {
     try {
-      const user = await getUser(ctx.request, ctx.env.DB)
+      const user = await getUser(request)
       if (!user) return unauthorized()
-      return await handler(ctx, user)
+      return await handler(request, user)
     } catch (e) {
       return dbErrorResponse(e)
     }
@@ -135,7 +138,7 @@ export function requireUser(
 
 export function validateCredentials(username: unknown, password: unknown): string | null {
   if (typeof username !== 'string' || !/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-    return 'Username must be 3–20 characters: letters, numbers, underscores.'
+    return 'Username must be 3-20 characters: letters, numbers, underscores.'
   }
   if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
     return 'Password must be at least 8 characters.'
