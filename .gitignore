@@ -8,8 +8,7 @@ dist/
 .vercel/
 
 # local env files (pulled via `vercel env pull`, contain real secrets)
-.env
-.env*.local
+.env*
 
 # OS noise
 .DS_Store
